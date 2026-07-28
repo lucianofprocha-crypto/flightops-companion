@@ -1,0 +1,97 @@
+# FlightOps Companion — Airport Intelligence
+
+Web app para consultar a climatologia de qualquer aeroporto do mundo
+(temperatura, vento, visibilidade em metros e condições de voo
+VFR/MVFR/IFR/LIFR) com base no histórico de observações METAR, além de ATIS
+ao vivo quando disponível. Acessível pelo navegador, tanto no desktop quanto
+no celular.
+
+Este não é um modelo de previsão numérica (NWP): é uma **projeção
+estatística** — "o que normalmente acontece neste aeroporto, nesta época e
+horário, com base nos últimos 30 dias / 365 dias / 5 anos observados".
+
+## Decisões tomadas nesta migração
+
+O projeto original (ChatGPT) tinha só a interface esboçada em PySide6
+(desktop), sem fonte de dados nem abordagem de previsão definidas. Para
+colocar algo funcional de pé, decidi:
+
+- **Arquitetura:** app web (FastAPI no backend + HTML/JS simples no
+  frontend, sem framework pesado), já que você quer acesso por celular e
+  desktop. O arquivo desktop original foi preservado em `legacy_desktop/`.
+- **Fonte de dados:** [Iowa Environmental Mesonet (IEM)](https://mesonet.agron.iastate.edu/request/download.phtml) —
+  arquivo histórico de METAR gratuito, sem API key, cobrindo aeroportos
+  brasileiros (testado com SBGR). Se preferir outra fonte (CheckWX, AVWX,
+  REDEMET etc.), o único arquivo a trocar é `backend/app/metar_client.py`.
+- **Abordagem:** climatologia estatística — distribuição de categorias de
+  voo, condições adversas por mês e por horário (UTC), a partir do histórico
+  bruto. `backend/app/climatology.py` concentra essa lógica; é o lugar para
+  evoluir para algo mais sofisticado (ex: modelos de série temporal) no
+  futuro.
+- **ICAO livre:** o app aceita qualquer código ICAO de 4 letras (não só os 5
+  aeroportos originais). A cobertura de dados depende do IEM Mesonet —
+  aeroportos pequenos/sem estação automatizada podem não ter histórico (o app
+  avisa de forma amigável nesse caso).
+- **ATIS ao vivo:** integrado via [atis.info](https://atis.info) (D-ATIS
+  digital da FAA, gratuito, sem API key). Cobertura é praticamente só EUA —
+  fora de lá, o card de ATIS simplesmente não aparece (não é tratado como
+  erro). `backend/app/atis_client.py`.
+- **NOTAM:** ainda não integrado. A fonte planejada é a API AISWEB do DECEA
+  (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo brasileiro) —
+  chave de API já solicitada, pendente de aprovação. Quando chegar, ativar em
+  `backend/app/notam_client.py` (a criar) seguindo o mesmo padrão de
+  `metar_client.py`.
+
+## Estrutura
+
+```
+backend/
+  app/
+    main.py          # API FastAPI + serve o frontend
+    metar_client.py  # busca histórico no IEM Mesonet
+    climatology.py   # cálculo das estatísticas
+    atis_client.py   # ATIS ao vivo (atis.info, cobertura EUA)
+  requirements.txt
+frontend/
+  index.html
+  app.js
+  styles.css
+legacy_desktop/
+  main.py            # protótipo original em PySide6 (Qt), mantido como referência
+```
+
+## Como rodar
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Acesse no navegador do computador: **http://localhost:8000**
+
+## Acessar pelo celular
+
+O celular precisa estar na **mesma rede Wi-Fi** do computador.
+
+1. Descubra o IP local do computador:
+   - macOS: `ipconfig getifaddr en0` (ou `en1` se usar Wi-Fi em outra interface)
+   - Windows: `ipconfig` (procure "Endereço IPv4")
+   - Linux: `hostname -I`
+2. No celular, abra o navegador em `http://<esse-IP>:8000` (ex:
+   `http://192.168.0.15:8000`).
+3. Se não carregar, confira o firewall do computador — ele pode estar
+   bloqueando conexões na porta 8000.
+
+Para acesso fora da rede local (de qualquer lugar), seria necessário fazer
+deploy em um servidor (Render, Railway, Fly.io, VPS etc.) — posso ajudar com
+isso quando quiser.
+
+## Próximos passos sugeridos
+
+- Adicionar mais aeroportos além dos 5 pré-cadastrados (`DEFAULT_AIRPORTS` em
+  `main.py`), ou permitir digitar qualquer ICAO.
+- Persistir os dados buscados (hoje o cache é só em memória e expira em 1h).
+- Deploy em produção para acesso de qualquer lugar, não só na mesma rede.

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FlightOps Companion</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <h1>FlightOps Companion</h1>
+    <p class="subtitle">Airport Intelligence &mdash; climatologia baseada em METAR histórico</p>
+  </header>
+
+  <main class="container">
+    <section class="card form-card">
+      <div class="field">
+        <label for="icao">ICAO (qualquer aeroporto do mundo)</label>
+        <input
+          type="text"
+          id="icao"
+          maxlength="4"
+          placeholder="Ex: SBGR, KJFK, EGLL..."
+          autocomplete="off"
+          autocapitalize="characters"
+          list="icao-sugestoes"
+        />
+        <datalist id="icao-sugestoes"></datalist>
+      </div>
+
+      <button id="analisar" class="btn-primary">ANALISAR</button>
+      <p id="status" class="status"></p>
+    </section>
+
+    <section id="sem-dados" class="card no-data-card hidden">
+      <p>📭 Sem dados históricos disponíveis para este aeroporto.</p>
+      <p class="muted">Esse ICAO pode não ter uma estação meteorológica automatizada reportando ao histórico público que usamos. Tente outro aeroporto ou período.</p>
+    </section>
+
+    <section id="resultados" class="results hidden">
+      <div id="metar-atual-card" class="card" style="overflow: hidden; max-width: 100%;">
+        <h3>Condições atuais (METAR)</h3>
+        <div id="metar-atual-content" style="overflow: hidden; max-width: 100%;"></div>
+      </div>
+
+      <div class="card summary-card">
+        <h2 id="res-titulo"></h2>
+        <p id="res-amostra" class="muted"></p>
+        <div class="metrics-grid">
+          <div class="metric">
+            <span class="metric-label">Temp. média</span>
+            <span class="metric-value" id="m-temp">&mdash;</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Vento médio</span>
+            <span class="metric-value" id="m-vento">&mdash;</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Visibilidade média</span>
+            <span class="metric-value" id="m-vis">&mdash;</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Condições adversas (IFR/LIFR)</span>
+            <span class="metric-value" id="m-adversas">&mdash;</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="atis-card" class="card hidden" style="overflow: hidden; max-width: 100%;">
+        <h3>ATIS ao vivo</h3>
+        <div id="atis-content" style="overflow: hidden; max-width: 100%;"></div>
+      </div>
+
+      <div class="card">
+        <h3>Categorias de voo (VFR / MVFR / IFR / LIFR)</h3>
+        <div class="chart-container">
+          <canvas id="chart-categorias"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Condições adversas por mês</h3>
+        <div class="chart-container">
+          <canvas id="chart-mes"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Condições adversas por horário (UTC)</h3>
+        <div class="chart-container">
+          <canvas id="chart-hora"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
