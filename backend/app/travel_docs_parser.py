@@ -244,6 +244,60 @@ def parse_eapis(pdf_bytes: bytes) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Lista de passageiros (formato "Voo NNN ... / Lista de Passageiros")
+# ---------------------------------------------------------------------------
+# Documento costuma ter várias páginas extras com fotos de passaporte
+# escaneadas (uma por página) — só a primeira página, com a tabela de
+# texto, é usada aqui; as páginas de imagem são ignoradas (não têm dados
+# adicionais além da conferência visual do passaporte, que fica fora do
+# escopo desta comparação automática).
+
+_PAXLIST_ROW_RE = re.compile(
+    r"^(?P<name>.+?)\s+(?P<dob>\d{1,2}\s\w{3}\s\d{4})\s+"
+    r"(?P<nat>[A-Z]{3}):\s+(?P<doc>\S+)\s+\((?P<exp>\d{1,2}\s\w{3}\s\d{4})\)\s*$"
+)
+
+
+def parse_passenger_list(pdf_bytes: bytes) -> dict:
+    with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+        text = pdf.pages[0].extract_text(layout=False) or ""
+
+    header: dict = {}
+    flight_m = re.search(r"Voo\s+(\S+)\s+(.+)", text)
+    if flight_m:
+        header["flight_number"] = flight_m.group(1)
+        header["operator"] = flight_m.group(2).strip()
+    dep_m = re.search(r"DEP\s+(.+)", text)
+    if dep_m:
+        header["departure"] = dep_m.group(1).strip()
+    arr_m = re.search(r"ARR\s+(.+)", text)
+    if arr_m:
+        header["arrival"] = arr_m.group(1).strip()
+
+    people: list[Person] = []
+    for line in text.split("\n"):
+        m = _PAXLIST_ROW_RE.match(line.strip())
+        if not m:
+            continue
+        g = m.groupdict()
+        dob_iso, uncertain = _normalize_date(g["dob"], "dd_mon_yyyy")
+        people.append(
+            Person(
+                doc_source="Lista de passageiros",
+                role="Passenger",
+                name=g["name"].strip(),
+                nationality=g["nat"],
+                document_number=g["doc"],
+                dob_raw=g["dob"],
+                dob_iso=dob_iso,
+                ocr_uncertain=uncertain,
+            )
+        )
+
+    return {"header": header, "people": [asdict(p) for p in people]}
+
+
+# ---------------------------------------------------------------------------
 # eGAR (Reino Unido) — sem texto incorporado, lido via OCR
 # ---------------------------------------------------------------------------
 
@@ -493,7 +547,8 @@ def compare_people(people_by_doc: dict[str, list[dict]]) -> list[dict]:
 
 
 def build_docs_summary(files: dict[str, bytes]) -> dict:
-    """files: dict com chaves opcionais 'gedec', 'eapis', 'egar' -> bytes do PDF."""
+    """files: dict com chaves opcionais 'gedec', 'eapis', 'egar',
+    'passenger_list' -> bytes do PDF."""
     people_by_doc: dict[str, list[dict]] = {}
     docs_info: dict[str, dict] = {}
 
@@ -511,6 +566,11 @@ def build_docs_summary(files: dict[str, bytes]) -> dict:
         result = parse_egar(files["egar"])
         people_by_doc["eGAR"] = result["people"]
         docs_info["eGAR"] = result["header"]
+
+    if files.get("passenger_list"):
+        result = parse_passenger_list(files["passenger_list"])
+        people_by_doc["Lista de passageiros"] = result["people"]
+        docs_info["Lista de passageiros"] = result["header"]
 
     comparison = compare_people(people_by_doc) if people_by_doc else []
 

@@ -26,6 +26,7 @@ const $checklistContent = document.getElementById("checklist-content");
 const $docGedec = document.getElementById("doc-gedec");
 const $docEapis = document.getElementById("doc-eapis");
 const $docEgar = document.getElementById("doc-egar");
+const $docPax = document.getElementById("doc-pax");
 const $btnDocs = document.getElementById("comparar-docs");
 const $docsStatus = document.getElementById("docs-status");
 const $docsResultados = document.getElementById("docs-resultados");
@@ -672,9 +673,10 @@ async function compararDocumentos() {
   const gedec = $docGedec.files[0];
   const eapis = $docEapis.files[0];
   const egar = $docEgar.files[0];
+  const pax = $docPax.files[0];
 
-  if (!gedec && !eapis && !egar) {
-    setDocsStatus("Envie ao menos um PDF (GEDEC, eAPIS ou eGAR).", true);
+  if (!gedec && !eapis && !egar && !pax) {
+    setDocsStatus("Envie ao menos um PDF (GEDEC, eAPIS, eGAR ou lista de passageiros).", true);
     return;
   }
 
@@ -687,6 +689,7 @@ async function compararDocumentos() {
     if (gedec) formData.append("gedec", gedec);
     if (eapis) formData.append("eapis", eapis);
     if (egar) formData.append("egar", egar);
+    if (pax) formData.append("passenger_list", pax);
 
     const resp = await fetch(`${API_BASE}/api/traveldocs/compare`, {
       method: "POST",

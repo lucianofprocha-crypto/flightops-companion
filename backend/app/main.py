@@ -151,15 +151,19 @@ async def compare_travel_docs(
     gedec: UploadFile | None = File(None),
     eapis: UploadFile | None = File(None),
     egar: UploadFile | None = File(None),
+    passenger_list: UploadFile | None = File(None),
 ) -> dict:
-    """Recebe até 3 PDFs (GEDEC, eAPIS, eGAR — todos opcionais, mas envie ao
-    menos um) e cruza os dados de tripulação/passageiros entre eles: nome,
-    nacionalidade, número de documento e data de nascimento. Aponta
-    divergências entre documentos e quem está ausente em algum deles. O
-    eGAR não tem texto no PDF (é gerado via "imprimir em PDF" do
-    navegador) — seus dados vêm de OCR e são marcados como tal; confira
-    visualmente o PDF original em caso de divergência envolvendo o eGAR."""
-    uploads = {"gedec": gedec, "eapis": eapis, "egar": egar}
+    """Recebe até 4 PDFs (GEDEC, eAPIS, eGAR, lista de passageiros — todos
+    opcionais, mas envie ao menos um) e cruza os dados de
+    tripulação/passageiros entre eles: nome, nacionalidade, número de
+    documento e data de nascimento. Aponta divergências entre documentos e
+    quem está ausente em algum deles. O eGAR não tem texto no PDF (é
+    gerado via "imprimir em PDF" do navegador) — seus dados vêm de OCR e
+    são marcados como tal; confira visualmente o PDF original em caso de
+    divergência envolvendo o eGAR. A lista de passageiros costuma ter
+    páginas extras com fotos de passaporte escaneadas — só a primeira
+    página (com a tabela) é lida."""
+    uploads = {"gedec": gedec, "eapis": eapis, "egar": egar, "passenger_list": passenger_list}
     files: dict[str, bytes] = {}
     for key, upload in uploads.items():
         if upload is not None and upload.filename:
@@ -170,7 +174,10 @@ async def compare_travel_docs(
                 files[key] = data
 
     if not files:
-        raise HTTPException(status_code=400, detail="Envie ao menos um PDF (GEDEC, eAPIS ou eGAR).")
+        raise HTTPException(
+            status_code=400,
+            detail="Envie ao menos um PDF (GEDEC, eAPIS, eGAR ou lista de passageiros).",
+        )
 
     try:
         summary = build_docs_summary(files)

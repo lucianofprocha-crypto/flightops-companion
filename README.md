@@ -62,19 +62,21 @@ colocar algo funcional de pé, decidi:
   também verifica os itens de coordenação: atendimento confirmado na
   origem/destino, FPL aprovado, FPL OK, slots e PPR.
 - **Comparação de documentos de tripulação/passageiros (GEDEC, eAPIS,
-  eGAR):** `backend/app/travel_docs_parser.py` lê os três formulários e
-  cruza nome, nacionalidade, número de documento e data de nascimento de
-  cada pessoa entre eles, apontando divergências (ex: passaporte diferente
-  usado em um dos formulários) e quem está ausente em algum documento.
-  GEDEC e eAPIS têm texto extraível normalmente; o eGAR (Reino Unido) é
-  gerado via "imprimir em PDF" do navegador e não tem texto embutido — os
-  dados dele vêm de **OCR** (pytesseract sobre a página renderizada,
-  reconstruindo a tabela por posição das colunas). Por depender de OCR, o
-  campo `document_number` do eGAR pode confundir caracteres parecidos (ex:
+  eGAR, lista de passageiros):** `backend/app/travel_docs_parser.py` lê os
+  quatro documentos e cruza nome, nacionalidade, número de documento e
+  data de nascimento de cada pessoa entre eles, apontando divergências
+  (ex: passaporte diferente usado em um dos formulários) e quem está
+  ausente em algum documento. GEDEC, eAPIS e a lista de passageiros têm
+  texto extraível normalmente (a lista de passageiros costuma vir com
+  páginas extras de fotos de passaporte escaneadas — só a primeira página,
+  com a tabela, é lida). O eGAR (Reino Unido) é gerado via "imprimir em
+  PDF" do navegador e não tem texto embutido — os dados dele vêm de
+  **OCR** (pytesseract sobre a página renderizada, reconstruindo a tabela
+  por posição das colunas). Por depender de OCR, o campo
+  `document_number` do eGAR pode confundir caracteres parecidos (ex:
   `0`/`O`, `1`/`I`); toda pessoa vinda do eGAR é marcada com `"ocr": true`
   e o app avisa na tela pra conferir visualmente o PDF original quando uma
-  divergência envolver o eGAR. Ainda não há um exemplo de "lista de
-  passageiros" genérica — o parser cobre GEDEC/eAPIS/eGAR por enquanto.
+  divergência envolver o eGAR.
 
 ## Estrutura
 
