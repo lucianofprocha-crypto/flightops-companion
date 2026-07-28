@@ -26,9 +26,13 @@ from datetime import datetime
 from io import BytesIO
 
 import pdfplumber
-import pypdfium2 as pdfium
-import pytesseract
-from pytesseract import Output
+
+# pypdfium2/pytesseract só são importados dentro de parse_egar() (import
+# tardio) — são as únicas funções que precisam deles. Importar no topo do
+# módulo carregaria essas bibliotecas (+ o binário tesseract-ocr por trás)
+# na memória de TODO request, mesmo os que não leem eGAR nenhum, o que é
+# desperdício de memória no plano free do Render (512MB) e pode derrubar o
+# processo com OOM em requests que nem usam OCR.
 
 # ---------------------------------------------------------------------------
 # Modelo comum
@@ -307,6 +311,10 @@ _EGAR_NOISE_RE = re.compile(r"^[a-zA-Z]{0,3}[:.]$")
 
 
 def _egar_ocr_words(pdf_bytes: bytes, scale: int = 3):
+    import pypdfium2 as pdfium
+    import pytesseract
+    from pytesseract import Output
+
     doc = pdfium.PdfDocument(BytesIO(pdf_bytes))
     page = doc[0]
     image = page.render(scale=scale).to_pil()
