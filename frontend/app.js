@@ -23,6 +23,15 @@ const $routeContent = document.getElementById("route-content");
 const $checklistCard = document.getElementById("checklist-card");
 const $checklistContent = document.getElementById("checklist-content");
 
+const $docGedec = document.getElementById("doc-gedec");
+const $docEapis = document.getElementById("doc-eapis");
+const $docEgar = document.getElementById("doc-egar");
+const $btnDocs = document.getElementById("comparar-docs");
+const $docsStatus = document.getElementById("docs-status");
+const $docsResultados = document.getElementById("docs-resultados");
+const $docsOcrAviso = document.getElementById("docs-ocr-aviso");
+const $docsComparacao = document.getElementById("docs-comparacao");
+
 let chartCategorias, chartMes, chartHora;
 
 const CATEGORY_COLORS = {
@@ -654,10 +663,161 @@ function renderChecklist(route) {
   }
 }
 
+function setDocsStatus(msg, isError = false) {
+  $docsStatus.textContent = msg;
+  $docsStatus.classList.toggle("error", isError);
+}
+
+async function compararDocumentos() {
+  const gedec = $docGedec.files[0];
+  const eapis = $docEapis.files[0];
+  const egar = $docEgar.files[0];
+
+  if (!gedec && !eapis && !egar) {
+    setDocsStatus("Envie ao menos um PDF (GEDEC, eAPIS ou eGAR).", true);
+    return;
+  }
+
+  $btnDocs.disabled = true;
+  $docsResultados.classList.add("hidden");
+  setDocsStatus("Lendo documentos...");
+
+  try {
+    const formData = new FormData();
+    if (gedec) formData.append("gedec", gedec);
+    if (eapis) formData.append("eapis", eapis);
+    if (egar) formData.append("egar", egar);
+
+    const resp = await fetch(`${API_BASE}/api/traveldocs/compare`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `Erro ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    renderDocsComparison(data);
+    setDocsStatus("");
+  } catch (err) {
+    setDocsStatus(`Erro: ${err.message}`, true);
+  } finally {
+    $btnDocs.disabled = false;
+  }
+}
+
+const DOCS_FIELD_LABELS = {
+  name: "Nome",
+  nationality: "Nacionalidade",
+  document_number: "Documento nº",
+  dob_iso: "Nascimento",
+};
+
+function renderDocsComparison(data) {
+  $docsComparacao.innerHTML = "";
+
+  $docsOcrAviso.classList.toggle("hidden", !data.has_ocr);
+
+  if (!data.comparison || !data.comparison.length) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = "Nenhuma pessoa reconhecida nos documentos enviados.";
+    $docsComparacao.appendChild(p);
+    $docsResultados.classList.remove("hidden");
+    return;
+  }
+
+  for (const group of data.comparison) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.overflow = "hidden";
+    card.style.maxWidth = "100%";
+
+    const header = document.createElement("div");
+    header.className = "notam-item-header";
+
+    const nomeRepresentativo =
+      group.people.reduce((a, b) => ((a.name || "").length >= (b.name || "").length ? a : b)).name ||
+      "(sem nome)";
+    const titulo = document.createElement("span");
+    titulo.className = "notam-title";
+    titulo.textContent = nomeRepresentativo;
+    header.appendChild(titulo);
+
+    const badge = document.createElement("span");
+    badge.className = `notam-badge ${group.has_issue ? "inactive" : "active"}`;
+    badge.textContent = group.has_issue ? "divergência" : "confere";
+    header.appendChild(badge);
+
+    card.appendChild(header);
+
+    if (group.missing_from && group.missing_from.length) {
+      const missing = document.createElement("p");
+      missing.className = "muted";
+      missing.style.margin = "4px 0 8px";
+      missing.textContent = `Ausente em: ${group.missing_from.join(", ")}`;
+      card.appendChild(missing);
+    }
+
+    const table = document.createElement("table");
+    table.className = "docs-table";
+
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    headRow.appendChild(document.createElement("th"));
+    for (const label of Object.values(DOCS_FIELD_LABELS)) {
+      const th = document.createElement("th");
+      th.textContent = label;
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    for (const person of group.people) {
+      const tr = document.createElement("tr");
+
+      const tdDoc = document.createElement("td");
+      tdDoc.textContent = person._doc;
+      if (person.ocr) {
+        const tag = document.createElement("span");
+        tag.className = "docs-ocr-tag";
+        tag.textContent = "(OCR)";
+        tdDoc.appendChild(tag);
+      }
+      tr.appendChild(tdDoc);
+
+      for (const field of Object.keys(DOCS_FIELD_LABELS)) {
+        const td = document.createElement("td");
+        let value = person[field];
+        if (field === "dob_iso" && !value && person.dob_raw) {
+          value = `${person.dob_raw} (?)`;
+        }
+        td.textContent = value || "—";
+        if (group.mismatched_fields.includes(field)) {
+          td.classList.add("field-mismatch");
+        }
+        tr.appendChild(td);
+      }
+
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    card.appendChild(table);
+
+    $docsComparacao.appendChild(card);
+  }
+
+  $docsResultados.classList.remove("hidden");
+}
+
 $icao.addEventListener("input", () => {
   $icao.value = $icao.value.toUpperCase();
 });
 
 $btn.addEventListener("click", analisar);
 $btnBriefing.addEventListener("click", analisarBriefing);
+$btnDocs.addEventListener("click", compararDocumentos);
 carregarSugestoes();

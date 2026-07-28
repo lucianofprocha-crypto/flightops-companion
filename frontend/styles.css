@@ -307,6 +307,45 @@ textarea {
   border-top: 1px solid var(--border);
 }
 
+.docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.docs-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.docs-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.docs-table tr:last-child td {
+  border-bottom: none;
+}
+
+.docs-table td.field-mismatch {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--lifr);
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.docs-ocr-tag {
+  font-size: 9px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
 .checklist-icon {
   flex-shrink: 0;
   font-weight: 700;

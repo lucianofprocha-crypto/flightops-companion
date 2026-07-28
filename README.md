@@ -61,6 +61,20 @@ colocar algo funcional de pé, decidi:
   STRIP do FPL), o app compara as duas rotas waypoint a waypoint (diff) e
   também verifica os itens de coordenação: atendimento confirmado na
   origem/destino, FPL aprovado, FPL OK, slots e PPR.
+- **Comparação de documentos de tripulação/passageiros (GEDEC, eAPIS,
+  eGAR):** `backend/app/travel_docs_parser.py` lê os três formulários e
+  cruza nome, nacionalidade, número de documento e data de nascimento de
+  cada pessoa entre eles, apontando divergências (ex: passaporte diferente
+  usado em um dos formulários) e quem está ausente em algum documento.
+  GEDEC e eAPIS têm texto extraível normalmente; o eGAR (Reino Unido) é
+  gerado via "imprimir em PDF" do navegador e não tem texto embutido — os
+  dados dele vêm de **OCR** (pytesseract sobre a página renderizada,
+  reconstruindo a tabela por posição das colunas). Por depender de OCR, o
+  campo `document_number` do eGAR pode confundir caracteres parecidos (ex:
+  `0`/`O`, `1`/`I`); toda pessoa vinda do eGAR é marcada com `"ocr": true`
+  e o app avisa na tela pra conferir visualmente o PDF original quando uma
+  divergência envolver o eGAR. Ainda não há um exemplo de "lista de
+  passageiros" genérica — o parser cobre GEDEC/eAPIS/eGAR por enquanto.
 
 ## Estrutura
 
@@ -71,7 +85,8 @@ backend/
     metar_client.py  # busca histórico no IEM Mesonet
     climatology.py   # cálculo das estatísticas
     atis_client.py   # ATIS ao vivo (atis.info, cobertura EUA)
-    briefing_parser.py  # leitura/resumo de PDF de flight briefing
+    briefing_parser.py    # leitura/resumo de PDF de flight briefing
+    travel_docs_parser.py # comparação de GEDEC/eAPIS/eGAR
   requirements.txt
 frontend/
   index.html
@@ -79,9 +94,18 @@ frontend/
   styles.css
 legacy_desktop/
   main.py            # protótipo original em PySide6 (Qt), mantido como referência
+Dockerfile           # deploy (ver "Deploy" abaixo — precisa de Docker por causa do OCR)
 ```
 
 ## Como rodar
+
+A leitura do eGAR usa OCR (`pytesseract`), que depende do binário
+`tesseract-ocr` do sistema — instale antes de rodar localmente:
+
+```bash
+brew install tesseract        # macOS
+# ou: apt-get install tesseract-ocr   # Linux
+```
 
 ```bash
 cd backend
@@ -109,6 +133,16 @@ O celular precisa estar na **mesma rede Wi-Fi** do computador.
 Isso só é necessário rodando localmente. Pra acesso de qualquer lugar, use o
 link em produção no topo deste README — já está no ar via Render, deploy
 automatizado pelo `render.yaml` na raiz do repositório.
+
+## Deploy
+
+O deploy no Render usa **Docker** (`Dockerfile` na raiz), não o runtime
+nativo Python — o runtime nativo do Render não inclui o binário
+`tesseract-ocr` necessário pra leitura do eGAR, e não há como instalar
+pacotes de sistema nele. O Dockerfile instala o `tesseract-ocr` via
+`apt-get` antes de instalar as dependências Python. Isso deixa o build um
+pouco mais lento que antes (imagem Docker do zero), mas o restante do fluxo
+de deploy é o mesmo (push pro GitHub, Render redeploya automaticamente).
 
 ## Próximos passos sugeridos
 

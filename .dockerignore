@@ -1,0 +1,8 @@
+legacy_desktop/
+.git/
+.gitignore
+README.md
+backend/.venv/
+**/__pycache__/
+*.pyc
+.DS_Store

@@ -136,6 +136,32 @@
         <div id="checklist-content" style="overflow: hidden; max-width: 100%;"></div>
       </div>
     </section>
+
+    <section class="card form-card">
+      <h2>Comparar documentos de tripulação/passageiros</h2>
+      <p class="muted">Envie GEDEC, eAPIS e/ou eGAR (pelo menos um) para cruzar nome, nacionalidade, número de documento e data de nascimento entre eles antes do voo.</p>
+      <div class="field">
+        <label for="doc-gedec">GEDEC (General Declaration)</label>
+        <input type="file" id="doc-gedec" accept="application/pdf,.pdf" />
+      </div>
+      <div class="field">
+        <label for="doc-eapis">eAPIS</label>
+        <input type="file" id="doc-eapis" accept="application/pdf,.pdf" />
+      </div>
+      <div class="field">
+        <label for="doc-egar">eGAR</label>
+        <input type="file" id="doc-egar" accept="application/pdf,.pdf" />
+      </div>
+      <button id="comparar-docs" class="btn-primary">COMPARAR DOCUMENTOS</button>
+      <p id="docs-status" class="status"></p>
+    </section>
+
+    <section id="docs-resultados" class="results hidden">
+      <div id="docs-ocr-aviso" class="card hidden" style="overflow: hidden; max-width: 100%;">
+        <p class="muted" style="margin:0;">O eGAR não tem texto no PDF (é gerado via "imprimir em PDF" do navegador) — os dados dele vêm de OCR e podem ter erros de leitura (ex: 0/O, 1/I). Confira visualmente o PDF original se uma divergência envolvendo o eGAR for apontada abaixo.</p>
+      </div>
+      <div id="docs-comparacao" style="display:flex; flex-direction:column; gap:12px;"></div>
+    </section>
   </main>
 
   <script src="app.js"></script>

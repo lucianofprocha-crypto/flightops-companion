@@ -28,6 +28,7 @@ from .metar_client import (
     NoHistoricalDataError,
     fetch_historical_metar,
 )
+from .travel_docs_parser import build_docs_summary
 
 # Limite de tamanho pro upload de briefing (o PDF de exemplo tem ~3.7MB).
 _MAX_BRIEFING_SIZE_BYTES = 20 * 1024 * 1024  # 20MB
@@ -140,6 +141,42 @@ async def upload_briefing(
     except Exception as exc:  # leitura de PDF é best-effort; nunca deve travar o usuário
         raise HTTPException(
             status_code=422, detail=f"Não foi possível ler o PDF: {exc}"
+        ) from exc
+
+    return summary
+
+
+@app.post("/api/traveldocs/compare")
+async def compare_travel_docs(
+    gedec: UploadFile | None = File(None),
+    eapis: UploadFile | None = File(None),
+    egar: UploadFile | None = File(None),
+) -> dict:
+    """Recebe até 3 PDFs (GEDEC, eAPIS, eGAR — todos opcionais, mas envie ao
+    menos um) e cruza os dados de tripulação/passageiros entre eles: nome,
+    nacionalidade, número de documento e data de nascimento. Aponta
+    divergências entre documentos e quem está ausente em algum deles. O
+    eGAR não tem texto no PDF (é gerado via "imprimir em PDF" do
+    navegador) — seus dados vêm de OCR e são marcados como tal; confira
+    visualmente o PDF original em caso de divergência envolvendo o eGAR."""
+    uploads = {"gedec": gedec, "eapis": eapis, "egar": egar}
+    files: dict[str, bytes] = {}
+    for key, upload in uploads.items():
+        if upload is not None and upload.filename:
+            data = await upload.read()
+            if data:
+                if len(data) > _MAX_BRIEFING_SIZE_BYTES:
+                    raise HTTPException(status_code=413, detail=f"Arquivo {key} muito grande (máx. 20MB).")
+                files[key] = data
+
+    if not files:
+        raise HTTPException(status_code=400, detail="Envie ao menos um PDF (GEDEC, eAPIS ou eGAR).")
+
+    try:
+        summary = build_docs_summary(files)
+    except Exception as exc:  # leitura de PDF é best-effort; nunca deve travar o usuário
+        raise HTTPException(
+            status_code=422, detail=f"Não foi possível ler os documentos: {exc}"
         ) from exc
 
     return summary
