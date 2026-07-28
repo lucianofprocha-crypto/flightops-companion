@@ -16,6 +16,7 @@ cada NOTAM/METAR/TAF é sempre preservado para conferência.
 
 from __future__ import annotations
 
+import difflib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -472,14 +473,254 @@ def _dedupe_notams(records: list[NotamRecord]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# ROUTE — plano de voo ICAO (do PDF) x plano operacional apresentado (texto)
+# ---------------------------------------------------------------------------
+
+
+def _degrid(s: str) -> str:
+    """Remove todos os espaços — usado nos campos do formulário ICAO FLIGHT
+    PLAN do PDF, que vêm com um caractere por célula (ex: 'P S S R N')."""
+    return re.sub(r"\s+", "", s)
+
+
+def parse_route_from_briefing(pdf) -> dict | None:
+    """Localiza a página 'ICAO FLIGHT PLAN' do briefing e extrai os campos
+    do plano de voo, principalmente o campo 15 (ROUTE)."""
+    page = None
+    for p in pdf.pages:
+        text = _plain_text(p)
+        first_line = text.split("\n", 1)[0].strip() if text else ""
+        if first_line == "ICAO FLIGHT PLAN":
+            page = p
+            break
+    if page is None:
+        return None
+
+    raw = _plain_text(page)
+    clean = raw.replace("☰", " ").replace("<<", " ").replace("<", " ")
+
+    result: dict = {
+        "source": "PDF (ICAO FLIGHT PLAN)",
+        "callsign": None,
+        "flight_rules": None,
+        "departure_icao": None,
+        "departure_time": None,
+        "destination_icao": None,
+        "total_eet": None,
+        "alternate_icao": None,
+        "dof": None,
+        "route": None,
+        "route_tokens": [],
+    }
+
+    m78 = re.search(r"\(FPL\s*[─\-]\s*(.+?)\s*[─\-]\s*(.+?)\s*\n", clean, re.S)
+    if m78:
+        result["callsign"] = _degrid(m78.group(1))
+        result["flight_rules"] = _degrid(m78.group(2))
+
+    m13 = re.search(r"13 DEPARTURE AERODROME TIME.*?[─\-]\s*(.+?)\s*\n", clean, re.S)
+    if m13:
+        dep = _degrid(m13.group(1))
+        result["departure_icao"] = dep[:4] or None
+        result["departure_time"] = dep[4:] or None
+
+    m15 = re.search(r"CRUISING SPEED LEVEL ROUTE.*?⇒\s*(.+?)\s*TOTAL EET", clean, re.S)
+    if m15:
+        route_text = re.sub(r"\s+", " ", m15.group(1)).strip()
+        result["route"] = route_text
+        result["route_tokens"] = route_text.split(" ") if route_text else []
+
+    m16 = re.search(r"16 DESTINATION AERODROME.*?[─\-]\s*(.+?)\s*\n", clean, re.S)
+    if m16:
+        dest = _degrid(m16.group(1)).replace("⇒", "|")
+        parts = [p for p in dest.split("|") if p]
+        if parts:
+            result["destination_icao"] = parts[0][:4] or None
+            result["total_eet"] = parts[0][4:] or None
+        if len(parts) > 1:
+            result["alternate_icao"] = parts[1]
+
+    m18 = re.search(r"18 OTHER INFORMATION\s*\n\s*[─\-]\s*(.+?)\)", clean, re.S)
+    if m18:
+        dof_m = re.search(r"DOF/(\d{6})", m18.group(1))
+        if dof_m:
+            result["dof"] = dof_m.group(1)
+
+    if not result["route"]:
+        return None
+    return result
+
+
+_PLAN_HEADER_RE = re.compile(
+    r"^(?P<callsign>\S+)\s*-.*?DOF:\s*(?P<dof>[\d/]+).*?"
+    r"(?P<dep_icao>[A-Z]{4})\s+(?P<dep_time>\d{2}:\d{2}Z?).*?"
+    r"(?P<arr_icao>[A-Z]{4})\s+(?P<arr_time>\d{2}:\d{2}Z?)",
+    re.S,
+)
+
+
+def _parse_fpl_strip(block_text: str) -> dict:
+    """Faz o parse do 'STRIP' ICAO compacto (formato '(FPL-CALLSIGN-RULES-
+    TIPO/ESTEIRA-EQUIP-DEPICAO+HORA-VELNIVEL ROTA-DESTICAO+EET ALTN-INFO)'),
+    como o colado pelo despachante, separando por '-' (o texto livre das
+    rotas e do campo de outras informações não costuma conter hífens)."""
+    result: dict = {
+        "source": "Plano apresentado (STRIP)",
+        "callsign": None,
+        "flight_rules": None,
+        "departure_icao": None,
+        "departure_time": None,
+        "destination_icao": None,
+        "total_eet": None,
+        "alternate_icao": None,
+        "dof": None,
+        "route": None,
+        "route_tokens": [],
+    }
+
+    m = re.search(r"\(FPL.*?\)", block_text, re.S)
+    if not m:
+        return result
+
+    block = re.sub(r"\s+", " ", m.group(0)).strip()
+    parts = [p.strip() for p in block.split("-")]
+    if len(parts) < 8:
+        return result
+
+    result["callsign"] = parts[1] or None
+    result["flight_rules"] = parts[2] or None
+
+    dep = parts[5]
+    if dep:
+        result["departure_icao"] = dep[:4] or None
+        result["departure_time"] = dep[4:].strip() or None
+
+    speed_level_route = parts[6]
+    tokens = speed_level_route.split(" ")
+    if len(tokens) > 1:
+        route_text = " ".join(tokens[1:]).strip()
+        result["route"] = route_text
+        result["route_tokens"] = route_text.split(" ") if route_text else []
+
+    dest_block = parts[7].split(" ")
+    dest_block = [t for t in dest_block if t]
+    if dest_block:
+        dest = dest_block[0]
+        result["destination_icao"] = dest[:4] or None
+        result["total_eet"] = dest[4:] or None
+    if len(dest_block) > 1:
+        result["alternate_icao"] = dest_block[1]
+
+    if len(parts) > 8:
+        dof_m = re.search(r"DOF/(\d{6})", parts[8])
+        if dof_m:
+            result["dof"] = dof_m.group(1)
+
+    return result
+
+
+def parse_plan_text(text: str) -> dict:
+    """Faz o parse do texto colado do plano operacional apresentado (mensagem
+    do despachante com atendimentos, OBS e o STRIP do plano de voo)."""
+    strip_split = re.split(r"\bSTRIP:\s*", text, maxsplit=1, flags=re.I)
+    header_block = strip_split[0]
+    strip_block = strip_split[1] if len(strip_split) > 1 else ""
+
+    result: dict = {
+        "callsign": None,
+        "dof": None,
+        "departure_icao": None,
+        "departure_time": None,
+        "arrival_icao": None,
+        "arrival_time": None,
+        "handling_origem_confirmado": None,
+        "handling_destino_confirmado": None,
+        "fpl_aprovado": False,
+        "fpl_ok": False,
+        "slots": {},
+        "ppr": {},
+        "obs": [],
+    }
+
+    first_line = text.strip().split("\n", 1)[0] if text.strip() else ""
+    header_m = _PLAN_HEADER_RE.search(first_line)
+    if header_m:
+        g = header_m.groupdict()
+        result["callsign"] = g["callsign"]
+        result["dof"] = g["dof"]
+        result["departure_icao"] = g["dep_icao"]
+        result["departure_time"] = g["dep_time"]
+        result["arrival_icao"] = g["arr_icao"]
+        result["arrival_time"] = g["arr_time"]
+
+    origem_m = re.search(r"ORIGEM:\s*(.+)", header_block)
+    if origem_m:
+        result["handling_origem_confirmado"] = "✅" in origem_m.group(1)
+
+    destino_m = re.search(r"DESTINO:\s*(.+)", header_block)
+    if destino_m:
+        result["handling_destino_confirmado"] = "✅" in destino_m.group(1)
+
+    obs_lines = re.findall(r"^→\s*(.+)$", header_block, re.M)
+    result["obs"] = obs_lines
+    result["fpl_aprovado"] = any("FPL APROVADO" in line.upper() for line in obs_lines)
+    result["fpl_ok"] = bool(re.search(r"FPL OK\s*✅", header_block))
+
+    for icao, val in re.findall(r"SLOT\s+([A-Z]{4}):?\s*(.+)", header_block):
+        result["slots"].setdefault(icao, val.strip())
+    for icao, val in re.findall(r"PPR\s+([A-Z]{4}):?\s*(\S+)", header_block):
+        result["ppr"].setdefault(icao, val.strip())
+
+    fpl = _parse_fpl_strip(strip_block or text)
+    result["route"] = fpl["route"]
+    result["route_tokens"] = fpl["route_tokens"]
+    result["fpl"] = fpl
+
+    return result
+
+
+def compare_routes(route_a: str | None, route_b: str | None) -> dict:
+    """Compara a rota do briefing (a) com a do plano apresentado (b),
+    token a token (waypoints/aerovias), usando diff de sequência."""
+    tokens_a = route_a.split() if route_a else []
+    tokens_b = route_b.split() if route_b else []
+
+    if not tokens_a or not tokens_b:
+        return {
+            "available": False,
+            "match": False,
+            "similarity": 0.0,
+            "tokens_a": tokens_a,
+            "tokens_b": tokens_b,
+            "diff": [],
+        }
+
+    sm = difflib.SequenceMatcher(None, tokens_a, tokens_b)
+    diff = [
+        {"op": tag, "a": tokens_a[i1:i2], "b": tokens_b[j1:j2]}
+        for tag, i1, i2, j1, j2 in sm.get_opcodes()
+    ]
+
+    return {
+        "available": True,
+        "match": tokens_a == tokens_b,
+        "similarity": round(sm.ratio(), 3),
+        "tokens_a": tokens_a,
+        "tokens_b": tokens_b,
+        "diff": diff,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Resumo consolidado
 # ---------------------------------------------------------------------------
 
 
-def build_summary(pdf_bytes: bytes, filename: str = "briefing.pdf") -> dict:
+def build_summary(pdf_bytes: bytes, filename: str = "briefing.pdf", plan_text: str | None = None) -> dict:
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
         weather = parse_weather(pdf)
         notam_records = parse_notams(pdf)
+        route_briefing = parse_route_from_briefing(pdf)
 
     # Só interessam fechamentos de pista, táxi e aeródromo/aeroporto.
     closures = [r for r in notam_records if _is_closure(r.title)]
@@ -494,6 +735,15 @@ def build_summary(pdf_bytes: bytes, filename: str = "briefing.pdf") -> dict:
     for r in closures:
         by_category[r.category] = by_category.get(r.category, 0) + 1
 
+    route: dict = {"briefing": route_briefing, "plan": None, "comparison": None}
+    if plan_text and plan_text.strip():
+        plan = parse_plan_text(plan_text)
+        route["plan"] = plan
+        route["comparison"] = compare_routes(
+            route_briefing["route"] if route_briefing else None,
+            plan.get("route"),
+        )
+
     return {
         "filename": filename,
         "pages_read": True,
@@ -506,4 +756,5 @@ def build_summary(pdf_bytes: bytes, filename: str = "briefing.pdf") -> dict:
             "top_attention": deduped,
             "filter_note": "Somente fechamentos de pista, táxi e aeródromo/aeroporto.",
         },
+        "route": route,
     }

@@ -100,6 +100,16 @@
       <div class="field">
         <input type="file" id="briefing-file" accept="application/pdf,.pdf" />
       </div>
+
+      <div class="field">
+        <label for="plan-text">Plano apresentado (opcional)</label>
+        <textarea
+          id="plan-text"
+          rows="4"
+          placeholder="Cole aqui a mensagem do despachante (com o STRIP do plano de voo) para comparar a rota e checar os itens de coordenação."
+        ></textarea>
+      </div>
+
       <button id="analisar-briefing" class="btn-primary">ANALISAR BRIEFING</button>
       <p id="briefing-status" class="status"></p>
     </section>
@@ -114,6 +124,16 @@
         <h3>NOTAMs &mdash; fechamentos (pista / táxi / aeródromo)</h3>
         <p id="briefing-notam-resumo" class="muted"></p>
         <div id="briefing-notams" style="overflow: hidden; max-width: 100%;"></div>
+      </div>
+
+      <div id="route-card" class="card hidden" style="overflow: hidden; max-width: 100%;">
+        <h3>Rota &mdash; briefing x plano apresentado</h3>
+        <div id="route-content" style="overflow: hidden; max-width: 100%;"></div>
+      </div>
+
+      <div id="checklist-card" class="card hidden" style="overflow: hidden; max-width: 100%;">
+        <h3>Itens de coordenação</h3>
+        <div id="checklist-content" style="overflow: hidden; max-width: 100%;"></div>
       </div>
     </section>
   </main>

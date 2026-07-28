@@ -47,15 +47,20 @@ colocar algo funcional de pé, decidi:
   padrão de `metar_client.py`.
 - **Leitura de flight briefing (PDF):** upload de PDF de despacho (ex:
   ForeFlight) com extração automática dos pontos de atenção. Implementado em
-  `backend/app/briefing_parser.py`: localiza a página de METAR/TAF/SIGMET e
-  as páginas de NOTAM (mesmo em layout de 2 colunas), separa os NOTAMs
-  individuais, classifica por categoria (pista, táxi, obstáculo, espaço
-  aéreo restrito, procedimentos IFR, drone/UAS etc.), marca quais estão
-  vigentes no momento e deduplica NOTAMs repetitivos (ex: várias notas de
-  drone contra aeroportos vizinhos). É uma leitura "melhor esforço" para o
-  formato observado nos briefings do ForeFlight — não substitui a
-  conferência do PDF original, que continua disponível junto de cada ponto
-  extraído.
+  `backend/app/briefing_parser.py`: localiza a página de METAR/TAF/SIGMET
+  (classifica cada aeroporto em VFR/SVFR/IFR a partir de visibilidade e teto)
+  e as páginas de NOTAM (mesmo em layout de 2 colunas), mas só destaca
+  fechamentos de pista, táxi e aeródromo/aeroporto — deduplicados quando
+  repetitivos e marcados como vigentes ou não no momento. É uma leitura
+  "melhor esforço" para o formato observado nos briefings do ForeFlight —
+  não substitui a conferência do PDF original, que continua disponível junto
+  de cada ponto extraído.
+- **Comparação de rota:** a página "ICAO FLIGHT PLAN" do PDF é lida para
+  extrair a rota (campo 15) e demais dados do plano de voo. Colando no campo
+  opcional o texto do "plano apresentado" (mensagem do despachante com o
+  STRIP do FPL), o app compara as duas rotas waypoint a waypoint (diff) e
+  também verifica os itens de coordenação: atendimento confirmado na
+  origem/destino, FPL aprovado, FPL OK, slots e PPR.
 
 ## Estrutura
 

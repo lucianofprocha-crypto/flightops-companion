@@ -11,12 +11,17 @@ const $atisContent = document.getElementById("atis-content");
 const $metarAtualContent = document.getElementById("metar-atual-content");
 
 const $briefingFile = document.getElementById("briefing-file");
+const $planText = document.getElementById("plan-text");
 const $btnBriefing = document.getElementById("analisar-briefing");
 const $briefingStatus = document.getElementById("briefing-status");
 const $briefingResultados = document.getElementById("briefing-resultados");
 const $briefingWeather = document.getElementById("briefing-weather");
 const $briefingNotamResumo = document.getElementById("briefing-notam-resumo");
 const $briefingNotams = document.getElementById("briefing-notams");
+const $routeCard = document.getElementById("route-card");
+const $routeContent = document.getElementById("route-content");
+const $checklistCard = document.getElementById("checklist-card");
+const $checklistContent = document.getElementById("checklist-content");
 
 let chartCategorias, chartMes, chartHora;
 
@@ -315,6 +320,10 @@ async function analisarBriefing() {
   try {
     const formData = new FormData();
     formData.append("file", file);
+    const planText = $planText.value.trim();
+    if (planText) {
+      formData.append("plan_text", planText);
+    }
 
     const resp = await fetch(`${API_BASE}/api/briefing/upload`, {
       method: "POST",
@@ -339,6 +348,8 @@ async function analisarBriefing() {
 function renderBriefing(data) {
   renderBriefingWeather(data.weather);
   renderBriefingNotams(data.notams);
+  renderRoute(data.route);
+  renderChecklist(data.route);
   $briefingResultados.classList.remove("hidden");
 }
 
@@ -474,6 +485,172 @@ function renderBriefingNotams(notams) {
     bloco.appendChild(texto);
 
     $briefingNotams.appendChild(bloco);
+  }
+}
+
+function buildDiffLine(diffArray, side) {
+  const wrap = document.createElement("div");
+  wrap.className = "route-tokens";
+  for (const seg of diffArray) {
+    const tokens = seg[side];
+    if (!tokens.length) continue;
+    for (const tok of tokens) {
+      const span = document.createElement("span");
+      span.className = "route-token";
+      if (seg.op !== "equal") {
+        span.classList.add(side === "a" ? "removed" : "added");
+      }
+      span.textContent = tok;
+      wrap.appendChild(span);
+    }
+  }
+  return wrap;
+}
+
+function renderRoute(route) {
+  $routeContent.innerHTML = "";
+
+  if (!route || (!route.briefing && !route.plan)) {
+    $routeCard.classList.add("hidden");
+    return;
+  }
+  $routeCard.classList.remove("hidden");
+
+  const briefing = route.briefing;
+  const plan = route.plan;
+  const cmp = route.comparison;
+
+  if (briefing) {
+    const info = document.createElement("p");
+    info.className = "muted";
+    info.style.margin = "0 0 8px";
+    info.textContent =
+      `PDF: ${briefing.departure_icao || "?"} → ${briefing.destination_icao || "?"}` +
+      (briefing.alternate_icao ? ` (altn ${briefing.alternate_icao})` : "");
+    $routeContent.appendChild(info);
+  }
+
+  if (plan) {
+    const info = document.createElement("p");
+    info.className = "muted";
+    info.style.margin = "0 0 8px";
+    info.textContent = `Plano apresentado: ${plan.departure_icao || "?"} → ${plan.arrival_icao || "?"}`;
+    $routeContent.appendChild(info);
+  }
+
+  if (cmp && cmp.available) {
+    const badge = document.createElement("span");
+    badge.className = `notam-badge ${cmp.match ? "active" : "inactive"}`;
+    badge.textContent = cmp.match ? "rotas idênticas" : `divergência · similaridade ${Math.round(cmp.similarity * 100)}%`;
+    badge.style.marginBottom = "8px";
+    badge.style.display = "inline-block";
+    $routeContent.appendChild(badge);
+
+    const lineA = document.createElement("div");
+    lineA.className = "route-line";
+    const labA = document.createElement("span");
+    labA.className = "route-line-label";
+    labA.textContent = "Briefing";
+    lineA.appendChild(labA);
+    lineA.appendChild(buildDiffLine(cmp.diff, "a"));
+    $routeContent.appendChild(lineA);
+
+    const lineB = document.createElement("div");
+    lineB.className = "route-line";
+    const labB = document.createElement("span");
+    labB.className = "route-line-label";
+    labB.textContent = "Plano";
+    lineB.appendChild(labB);
+    lineB.appendChild(buildDiffLine(cmp.diff, "b"));
+    $routeContent.appendChild(lineB);
+  } else if (briefing && briefing.route_tokens.length) {
+    const lineA = document.createElement("div");
+    lineA.className = "route-line";
+    const labA = document.createElement("span");
+    labA.className = "route-line-label";
+    labA.textContent = "Briefing";
+    lineA.appendChild(labA);
+    const tokensWrap = document.createElement("div");
+    tokensWrap.className = "route-tokens";
+    for (const tok of briefing.route_tokens) {
+      const span = document.createElement("span");
+      span.className = "route-token";
+      span.textContent = tok;
+      tokensWrap.appendChild(span);
+    }
+    lineA.appendChild(tokensWrap);
+    $routeContent.appendChild(lineA);
+
+    const hint = document.createElement("p");
+    hint.className = "muted";
+    hint.style.margin = "8px 0 0";
+    hint.textContent = "Cole o plano apresentado no campo acima para comparar a rota.";
+    $routeContent.appendChild(hint);
+  } else if (plan && !briefing) {
+    const hint = document.createElement("p");
+    hint.className = "muted";
+    hint.textContent = "Não foi possível localizar a página ICAO FLIGHT PLAN neste PDF para comparar.";
+    $routeContent.appendChild(hint);
+  }
+}
+
+function checklistStatus(value) {
+  if (value === true) return { cls: "ok", icon: "✓" };
+  if (value === false) return { cls: "missing", icon: "✗" };
+  return { cls: "unknown", icon: "?" };
+}
+
+function addChecklistItem(container, value, label) {
+  const { cls, icon } = checklistStatus(value);
+  const item = document.createElement("div");
+  item.className = "checklist-item";
+  const iconEl = document.createElement("span");
+  iconEl.className = `checklist-icon ${cls}`;
+  iconEl.textContent = icon;
+  const labelEl = document.createElement("span");
+  labelEl.textContent = label;
+  item.appendChild(iconEl);
+  item.appendChild(labelEl);
+  container.appendChild(item);
+}
+
+function renderChecklist(route) {
+  $checklistContent.innerHTML = "";
+  const plan = route ? route.plan : null;
+
+  if (!plan) {
+    $checklistCard.classList.add("hidden");
+    return;
+  }
+  $checklistCard.classList.remove("hidden");
+
+  addChecklistItem($checklistContent, plan.handling_origem_confirmado, "Atendimento confirmado na origem");
+  addChecklistItem($checklistContent, plan.handling_destino_confirmado, "Atendimento confirmado no destino");
+  addChecklistItem($checklistContent, plan.fpl_aprovado, "FPL aprovado");
+  addChecklistItem($checklistContent, plan.fpl_ok, "FPL OK (checagem final)");
+
+  if (route.comparison && route.comparison.available) {
+    addChecklistItem($checklistContent, route.comparison.match, "Rota do plano confere com o briefing");
+  }
+
+  for (const [icao, valor] of Object.entries(plan.slots || {})) {
+    addChecklistItem($checklistContent, true, `Slot ${icao}: ${valor}`);
+  }
+  for (const [icao, valor] of Object.entries(plan.ppr || {})) {
+    addChecklistItem($checklistContent, true, `PPR ${icao}: ${valor}`);
+  }
+
+  if (plan.obs && plan.obs.length) {
+    const obsLabel = document.createElement("div");
+    obsLabel.className = "weather-field-label";
+    obsLabel.style.marginTop = "10px";
+    obsLabel.textContent = "OBS do despachante";
+    $checklistContent.appendChild(obsLabel);
+
+    const obsText = document.createElement("div");
+    obsText.className = "notam-text";
+    wrapText(obsText, plan.obs.map((l) => `→ ${l}`).join("\n"));
+    $checklistContent.appendChild(obsText);
   }
 }
 

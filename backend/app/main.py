@@ -15,7 +15,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -110,11 +110,17 @@ def get_climatology(
 
 
 @app.post("/api/briefing/upload")
-async def upload_briefing(file: UploadFile = File(...)) -> dict:
+async def upload_briefing(
+    file: UploadFile = File(...),
+    plan_text: str | None = Form(None),
+) -> dict:
     """Recebe um PDF de flight briefing (ex: ForeFlight) e devolve um
-    resumo estruturado: METAR/TAF/SIGMET por aeroporto e os principais
-    pontos de atenção entre os NOTAMs (classificados, deduplicados e
-    marcados como vigentes ou não no momento)."""
+    resumo estruturado: METAR/TAF/SIGMET por aeroporto, os principais
+    pontos de atenção entre os NOTAMs (fechamentos de pista/táxi/aeródromo)
+    e, se o texto do plano operacional apresentado (despachante) for
+    colado em plan_text, a comparação da rota do briefing com a do plano
+    apresentado, além da checagem dos itens de coordenação (atendimentos,
+    FPL aprovado, slots, PPR)."""
     if file.content_type not in (
         "application/pdf",
         "application/x-pdf",
@@ -130,7 +136,7 @@ async def upload_briefing(file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=413, detail="Arquivo muito grande (máx. 20MB).")
 
     try:
-        summary = build_summary(data, filename=file.filename or "briefing.pdf")
+        summary = build_summary(data, filename=file.filename or "briefing.pdf", plan_text=plan_text)
     except Exception as exc:  # leitura de PDF é best-effort; nunca deve travar o usuário
         raise HTTPException(
             status_code=422, detail=f"Não foi possível ler o PDF: {exc}"

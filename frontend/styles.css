@@ -242,6 +242,88 @@ input[type="file"] {
   color: var(--text);
 }
 
+textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.route-line {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.route-line-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  min-width: 70px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.route-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.route-token {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.route-token.removed {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--lifr);
+  text-decoration: line-through;
+}
+
+.route-token.added {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--vfr);
+}
+
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.checklist-item + .checklist-item {
+  border-top: 1px solid var(--border);
+}
+
+.checklist-icon {
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.checklist-icon.ok {
+  color: var(--vfr);
+}
+
+.checklist-icon.missing {
+  color: var(--lifr);
+}
+
+.checklist-icon.unknown {
+  color: var(--muted);
+}
+
 .weather-station + .weather-station {
   margin-top: 14px;
   padding-top: 14px;
