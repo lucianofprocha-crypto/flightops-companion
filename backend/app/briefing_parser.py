@@ -53,6 +53,62 @@ _STATION_HEADER_RE = re.compile(
 )
 _TIME_RE = re.compile(r"\((\d{3,4}Z?)\)")
 
+# Grupo de visibilidade em METAR ICAO (metros): exatamente 4 dígitos, seguido
+# no máximo por até 3 letras (ex: "9999", "6000", "0800NDV"). O uso de
+# fullmatch evita confundir com vento ("21003KT"), horário ("272030Z") ou
+# QNH ("Q1013"), que têm comprimento/posição de letras diferentes.
+_VIS_TOKEN_RE = re.compile(r"^(\d{4})[A-Z]{0,3}$")
+_CLOUD_LAYER_RE = re.compile(r"\b(FEW|SCT|BKN|OVC)(\d{3})\b")
+_VV_RE = re.compile(r"\bVV(\d{3})\b")
+
+
+def classify_weather(metar_raw: str | None) -> str | None:
+    """Classifica um METAR bruto em VFR / SVFR / IFR a partir de
+    visibilidade e teto (camadas BKN/OVC ou visibilidade vertical).
+
+    Limiares usados (convenção operacional brasileira/ICAO):
+      - VFR:  visibilidade >= 5000m e teto >= 1500ft (ou sem teto definido)
+      - SVFR: visibilidade >= 3000m e teto >= 500ft (faixa de VFR especial)
+      - IFR:  abaixo disso
+
+    CAVOK sempre classifica como VFR. Retorna None se não houver dados
+    suficientes no METAR para classificar."""
+    if not metar_raw:
+        return None
+
+    text = metar_raw.upper()
+    if "CAVOK" in text:
+        return "VFR"
+
+    vis_m: int | None = None
+    for tok in text.split():
+        m = _VIS_TOKEN_RE.match(tok)
+        if m:
+            vis_m = int(m.group(1))
+            break
+    if vis_m is None:
+        sm_m = re.search(r"(\d+)\s*SM\b", text)
+        if sm_m:
+            vis_m = int(sm_m.group(1)) * 1609
+
+    heights = [int(h) * 100 for cov, h in _CLOUD_LAYER_RE.findall(text) if cov in ("BKN", "OVC")]
+    vv_m = _VV_RE.search(text)
+    if vv_m:
+        heights.append(int(vv_m.group(1)) * 100)
+    ceiling_ft = min(heights) if heights else None
+
+    if vis_m is None and ceiling_ft is None:
+        return None
+
+    vis = vis_m if vis_m is not None else 9999
+    ceiling = ceiling_ft if ceiling_ft is not None else 99999
+
+    if vis >= 5000 and ceiling >= 1500:
+        return "VFR"
+    if vis >= 3000 and ceiling >= 500:
+        return "SVFR"
+    return "IFR"
+
 
 @dataclass
 class WeatherStation:
@@ -62,6 +118,7 @@ class WeatherStation:
     observed_at: str | None
     metar: str | None
     taf: str | None
+    category: str | None = None  # VFR / SVFR / IFR, a partir do METAR
 
 
 def _find_weather_page(pdf) -> object | None:
@@ -146,6 +203,9 @@ def parse_weather(pdf) -> dict:
             continue
 
     flush_taf()
+
+    for s in stations:
+        s.category = classify_weather(s.metar)
 
     sigmet_text = " ".join(sigmet_lines).strip() or None
 
@@ -241,6 +301,26 @@ def _classify(title: str) -> tuple[str, int]:
         if pattern.search(title):
             return category, weight
     return "Outros", 1
+
+
+# Filtro de foco: por pedido, o resumo de NOTAM só destaca fechamentos de
+# pista, táxi e aeródromo/aeroporto — as demais categorias continuam sendo
+# classificadas internamente (útil se o filtro for relaxado no futuro), mas
+# não entram no resumo final.
+_CLOSURE_RE = re.compile(r"\b(RUNWAY|TAXIWAY|AERODROME|AIRPORT)\b[^\n]*\bCLOSED\b", re.I)
+
+
+def _closure_category(title: str) -> str:
+    t = title.upper()
+    if "RUNWAY" in t:
+        return "Pista fechada"
+    if "TAXIWAY" in t:
+        return "Táxi fechado"
+    return "Aeródromo fechado"
+
+
+def _is_closure(title: str) -> bool:
+    return bool(_CLOSURE_RE.search(title))
 
 
 @dataclass
@@ -401,24 +481,29 @@ def build_summary(pdf_bytes: bytes, filename: str = "briefing.pdf") -> dict:
         weather = parse_weather(pdf)
         notam_records = parse_notams(pdf)
 
-    deduped = _dedupe_notams(notam_records)
+    # Só interessam fechamentos de pista, táxi e aeródromo/aeroporto.
+    closures = [r for r in notam_records if _is_closure(r.title)]
+    for r in closures:
+        r.category = _closure_category(r.title)
+        r.severity = 3
+
+    deduped = _dedupe_notams(closures)
     deduped.sort(key=lambda g: (-g["severity"], -g["active_now"], -g["count"]))
 
     by_category: dict[str, int] = {}
-    for r in notam_records:
+    for r in closures:
         by_category[r.category] = by_category.get(r.category, 0) + 1
-
-    top_attention = deduped[:20]
 
     return {
         "filename": filename,
         "pages_read": True,
         "weather": weather,
         "notams": {
-            "total": len(notam_records),
-            "active_now": sum(1 for r in notam_records if r.active_now),
-            "new_today": sum(1 for r in notam_records if r.new_today),
+            "total": len(closures),
+            "active_now": sum(1 for r in closures if r.active_now),
+            "new_today": sum(1 for r in closures if r.new_today),
             "by_category": by_category,
-            "top_attention": top_attention,
+            "top_attention": deduped,
+            "filter_note": "Somente fechamentos de pista, táxi e aeródromo/aeroporto.",
         },
     }

@@ -329,6 +329,21 @@ input[type="file"] {
   color: var(--ifr);
 }
 
+.weather-badge-vfr {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--vfr);
+}
+
+.weather-badge-svfr {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--ifr);
+}
+
+.weather-badge-ifr {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--lifr);
+}
+
 .notam-meta {
   font-size: 11px;
   color: var(--muted);

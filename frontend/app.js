@@ -354,10 +354,23 @@ function renderBriefingWeather(weather) {
     const bloco = document.createElement("div");
     bloco.className = "weather-station";
 
-    const titulo = document.createElement("div");
+    const header = document.createElement("div");
+    header.className = "notam-item-header";
+
+    const titulo = document.createElement("span");
     titulo.className = "weather-station-title";
+    titulo.style.marginBottom = "0";
     titulo.textContent = `${station.role} — ${station.icao}${station.name ? " · " + station.name : ""}`;
-    bloco.appendChild(titulo);
+    header.appendChild(titulo);
+
+    if (station.category) {
+      const badge = document.createElement("span");
+      badge.className = `notam-badge weather-badge-${station.category.toLowerCase()}`;
+      badge.textContent = station.category;
+      header.appendChild(badge);
+    }
+
+    bloco.appendChild(header);
 
     if (station.metar) {
       const label = document.createElement("div");
@@ -403,12 +416,12 @@ function renderBriefingNotams(notams) {
   $briefingNotams.innerHTML = "";
 
   if (!notams || notams.total === 0) {
-    $briefingNotamResumo.textContent = "Nenhum NOTAM encontrado neste PDF.";
+    $briefingNotamResumo.textContent = "Nenhum fechamento de pista, táxi ou aeródromo encontrado neste PDF.";
     return;
   }
 
   $briefingNotamResumo.textContent =
-    `${notams.total} NOTAMs no briefing · ${notams.active_now} vigentes agora` +
+    `${notams.total} fechamentos (pista/táxi/aeródromo) · ${notams.active_now} vigentes agora` +
     (notams.new_today ? ` · ${notams.new_today} novos hoje` : "");
 
   const chipsWrap = document.createElement("div");
