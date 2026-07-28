@@ -93,6 +93,29 @@
         </div>
       </div>
     </section>
+
+    <section class="card form-card">
+      <h2>Leitura de flight briefing (PDF)</h2>
+      <p class="muted">Envie o PDF de despacho (ex: ForeFlight) para extrair automaticamente METAR/TAF/SIGMET e os principais pontos de atenção dos NOTAMs.</p>
+      <div class="field">
+        <input type="file" id="briefing-file" accept="application/pdf,.pdf" />
+      </div>
+      <button id="analisar-briefing" class="btn-primary">ANALISAR BRIEFING</button>
+      <p id="briefing-status" class="status"></p>
+    </section>
+
+    <section id="briefing-resultados" class="results hidden">
+      <div class="card" style="overflow: hidden; max-width: 100%;">
+        <h3>Meteorologia do briefing (METAR / TAF / SIGMET)</h3>
+        <div id="briefing-weather" style="overflow: hidden; max-width: 100%;"></div>
+      </div>
+
+      <div class="card" style="overflow: hidden; max-width: 100%;">
+        <h3>NOTAMs &mdash; pontos de atenção</h3>
+        <p id="briefing-notam-resumo" class="muted"></p>
+        <div id="briefing-notams" style="overflow: hidden; max-width: 100%;"></div>
+      </div>
+    </section>
   </main>
 
   <script src="app.js"></script>

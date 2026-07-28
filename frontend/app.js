@@ -10,6 +10,14 @@ const $atisCard = document.getElementById("atis-card");
 const $atisContent = document.getElementById("atis-content");
 const $metarAtualContent = document.getElementById("metar-atual-content");
 
+const $briefingFile = document.getElementById("briefing-file");
+const $btnBriefing = document.getElementById("analisar-briefing");
+const $briefingStatus = document.getElementById("briefing-status");
+const $briefingResultados = document.getElementById("briefing-resultados");
+const $briefingWeather = document.getElementById("briefing-weather");
+const $briefingNotamResumo = document.getElementById("briefing-notam-resumo");
+const $briefingNotams = document.getElementById("briefing-notams");
+
 let chartCategorias, chartMes, chartHora;
 
 const CATEGORY_COLORS = {
@@ -279,9 +287,187 @@ function renderChartHora(byHour) {
   });
 }
 
+function setBriefingStatus(msg, isError = false) {
+  $briefingStatus.textContent = msg;
+  $briefingStatus.classList.toggle("error", isError);
+}
+
+function wrapText(el, content) {
+  el.textContent = content;
+  el.style.whiteSpace = "pre-wrap";
+  el.style.overflowWrap = "anywhere";
+  el.style.wordBreak = "break-word";
+  el.style.maxWidth = "100%";
+  el.style.boxSizing = "border-box";
+}
+
+async function analisarBriefing() {
+  const file = $briefingFile.files[0];
+  if (!file) {
+    setBriefingStatus("Selecione um arquivo PDF primeiro.", true);
+    return;
+  }
+
+  $btnBriefing.disabled = true;
+  $briefingResultados.classList.add("hidden");
+  setBriefingStatus(`Lendo ${file.name}...`);
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const resp = await fetch(`${API_BASE}/api/briefing/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `Erro ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    renderBriefing(data);
+    setBriefingStatus("");
+  } catch (err) {
+    setBriefingStatus(`Erro: ${err.message}`, true);
+  } finally {
+    $btnBriefing.disabled = false;
+  }
+}
+
+function renderBriefing(data) {
+  renderBriefingWeather(data.weather);
+  renderBriefingNotams(data.notams);
+  $briefingResultados.classList.remove("hidden");
+}
+
+function renderBriefingWeather(weather) {
+  $briefingWeather.innerHTML = "";
+
+  if (!weather || !weather.available || !weather.stations.length) {
+    $briefingWeather.textContent = "Nenhuma seção de METAR/TAF encontrada neste PDF.";
+    return;
+  }
+
+  for (const station of weather.stations) {
+    const bloco = document.createElement("div");
+    bloco.className = "weather-station";
+
+    const titulo = document.createElement("div");
+    titulo.className = "weather-station-title";
+    titulo.textContent = `${station.role} — ${station.icao}${station.name ? " · " + station.name : ""}`;
+    bloco.appendChild(titulo);
+
+    if (station.metar) {
+      const label = document.createElement("div");
+      label.className = "weather-field-label";
+      label.textContent = "METAR";
+      const texto = document.createElement("div");
+      texto.className = "notam-text";
+      wrapText(texto, station.metar);
+      bloco.appendChild(label);
+      bloco.appendChild(texto);
+    }
+
+    if (station.taf) {
+      const label = document.createElement("div");
+      label.className = "weather-field-label";
+      label.textContent = "TAF";
+      const texto = document.createElement("div");
+      texto.className = "notam-text";
+      wrapText(texto, station.taf);
+      bloco.appendChild(label);
+      bloco.appendChild(texto);
+    }
+
+    $briefingWeather.appendChild(bloco);
+  }
+
+  if (weather.sigmet_airmet) {
+    const bloco = document.createElement("div");
+    bloco.className = "weather-station";
+    const label = document.createElement("div");
+    label.className = "weather-field-label";
+    label.textContent = "SIGMET / AIRMET";
+    const texto = document.createElement("div");
+    texto.className = "notam-text";
+    wrapText(texto, weather.sigmet_airmet);
+    bloco.appendChild(label);
+    bloco.appendChild(texto);
+    $briefingWeather.appendChild(bloco);
+  }
+}
+
+function renderBriefingNotams(notams) {
+  $briefingNotams.innerHTML = "";
+
+  if (!notams || notams.total === 0) {
+    $briefingNotamResumo.textContent = "Nenhum NOTAM encontrado neste PDF.";
+    return;
+  }
+
+  $briefingNotamResumo.textContent =
+    `${notams.total} NOTAMs no briefing · ${notams.active_now} vigentes agora` +
+    (notams.new_today ? ` · ${notams.new_today} novos hoje` : "");
+
+  const chipsWrap = document.createElement("div");
+  chipsWrap.className = "notam-summary-chips";
+  for (const [categoria, count] of Object.entries(notams.by_category)) {
+    const chip = document.createElement("span");
+    chip.className = "notam-chip";
+    chip.textContent = `${categoria}: ${count}`;
+    chipsWrap.appendChild(chip);
+  }
+  $briefingNotams.appendChild(chipsWrap);
+
+  for (const item of notams.top_attention) {
+    const bloco = document.createElement("div");
+    bloco.className = "notam-item";
+
+    const header = document.createElement("div");
+    header.className = "notam-item-header";
+
+    const titulo = document.createElement("span");
+    titulo.className = "notam-title";
+    titulo.textContent = item.title;
+    header.appendChild(titulo);
+
+    const badgeAtivo = document.createElement("span");
+    badgeAtivo.className = `notam-badge ${item.active_now ? "active" : "inactive"}`;
+    badgeAtivo.textContent = item.active_now ? "vigente" : "fora do período";
+    header.appendChild(badgeAtivo);
+
+    if (item.new_today) {
+      const badgeNovo = document.createElement("span");
+      badgeNovo.className = "notam-badge new";
+      badgeNovo.textContent = "novo hoje";
+      header.appendChild(badgeNovo);
+    }
+
+    bloco.appendChild(header);
+
+    const meta = document.createElement("div");
+    meta.className = "notam-meta";
+    const idsTxt = item.ids.slice(0, 5).join(", ") + (item.ids.length > 5 ? "…" : "");
+    const icaosTxt = item.icaos.length ? ` · ${item.icaos.join(", ")}` : "";
+    const countTxt = item.count > 1 ? ` · ${item.count}x` : "";
+    meta.textContent = `${item.category} · ${idsTxt}${icaosTxt}${countTxt}`;
+    bloco.appendChild(meta);
+
+    const texto = document.createElement("div");
+    texto.className = "notam-text";
+    wrapText(texto, item.text);
+    bloco.appendChild(texto);
+
+    $briefingNotams.appendChild(bloco);
+  }
+}
+
 $icao.addEventListener("input", () => {
   $icao.value = $icao.value.toUpperCase();
 });
 
 $btn.addEventListener("click", analisar);
+$btnBriefing.addEventListener("click", analisarBriefing);
 carregarSugestoes();

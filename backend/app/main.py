@@ -15,11 +15,12 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .atis_client import fetch_atis
+from .briefing_parser import build_summary
 from .climatology import compute_climatology
 from .metar_client import (
     PERIOD_TO_DAYS,
@@ -27,6 +28,9 @@ from .metar_client import (
     NoHistoricalDataError,
     fetch_historical_metar,
 )
+
+# Limite de tamanho pro upload de briefing (o PDF de exemplo tem ~3.7MB).
+_MAX_BRIEFING_SIZE_BYTES = 20 * 1024 * 1024  # 20MB
 
 app = FastAPI(title="FlightOps Companion API")
 
@@ -103,6 +107,36 @@ def get_climatology(
 
     _CACHE[cache_key] = (time.time(), result)
     return result
+
+
+@app.post("/api/briefing/upload")
+async def upload_briefing(file: UploadFile = File(...)) -> dict:
+    """Recebe um PDF de flight briefing (ex: ForeFlight) e devolve um
+    resumo estruturado: METAR/TAF/SIGMET por aeroporto e os principais
+    pontos de atenção entre os NOTAMs (classificados, deduplicados e
+    marcados como vigentes ou não no momento)."""
+    if file.content_type not in (
+        "application/pdf",
+        "application/x-pdf",
+        "binary/octet-stream",
+        "application/octet-stream",
+    ) and not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Envie um arquivo PDF.")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Arquivo vazio.")
+    if len(data) > _MAX_BRIEFING_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="Arquivo muito grande (máx. 20MB).")
+
+    try:
+        summary = build_summary(data, filename=file.filename or "briefing.pdf")
+    except Exception as exc:  # leitura de PDF é best-effort; nunca deve travar o usuário
+        raise HTTPException(
+            status_code=422, detail=f"Não foi possível ler o PDF: {exc}"
+        ) from exc
+
+    return summary
 
 
 # Serve o frontend estático na raiz (mesma origem -> funciona em desktop e celular)

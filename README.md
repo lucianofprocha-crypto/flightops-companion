@@ -1,5 +1,9 @@
 # FlightOps Companion — Airport Intelligence
 
+**App no ar:** https://flightops-companion.onrender.com (acessível de qualquer
+lugar, celular incluso — hospedado no plano grátis do Render, pode levar
+30-50s pra responder após período de inatividade).
+
 Web app para consultar a climatologia de qualquer aeroporto do mundo
 (temperatura, vento, visibilidade em metros e condições de voo
 VFR/MVFR/IFR/LIFR) com base no histórico de observações METAR, além de ATIS
@@ -36,11 +40,22 @@ colocar algo funcional de pé, decidi:
   digital da FAA, gratuito, sem API key). Cobertura é praticamente só EUA —
   fora de lá, o card de ATIS simplesmente não aparece (não é tratado como
   erro). `backend/app/atis_client.py`.
-- **NOTAM:** ainda não integrado. A fonte planejada é a API AISWEB do DECEA
-  (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo brasileiro) —
-  chave de API já solicitada, pendente de aprovação. Quando chegar, ativar em
-  `backend/app/notam_client.py` (a criar) seguindo o mesmo padrão de
-  `metar_client.py`.
+- **NOTAM (fonte oficial):** ainda não integrado. A fonte planejada é a API
+  AISWEB do DECEA (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo
+  brasileiro) — chave de API já solicitada, pendente de aprovação. Quando
+  chegar, ativar em `backend/app/notam_client.py` (a criar) seguindo o mesmo
+  padrão de `metar_client.py`.
+- **Leitura de flight briefing (PDF):** upload de PDF de despacho (ex:
+  ForeFlight) com extração automática dos pontos de atenção. Implementado em
+  `backend/app/briefing_parser.py`: localiza a página de METAR/TAF/SIGMET e
+  as páginas de NOTAM (mesmo em layout de 2 colunas), separa os NOTAMs
+  individuais, classifica por categoria (pista, táxi, obstáculo, espaço
+  aéreo restrito, procedimentos IFR, drone/UAS etc.), marca quais estão
+  vigentes no momento e deduplica NOTAMs repetitivos (ex: várias notas de
+  drone contra aeroportos vizinhos). É uma leitura "melhor esforço" para o
+  formato observado nos briefings do ForeFlight — não substitui a
+  conferência do PDF original, que continua disponível junto de cada ponto
+  extraído.
 
 ## Estrutura
 
@@ -51,6 +66,7 @@ backend/
     metar_client.py  # busca histórico no IEM Mesonet
     climatology.py   # cálculo das estatísticas
     atis_client.py   # ATIS ao vivo (atis.info, cobertura EUA)
+    briefing_parser.py  # leitura/resumo de PDF de flight briefing
   requirements.txt
 frontend/
   index.html
@@ -85,13 +101,15 @@ O celular precisa estar na **mesma rede Wi-Fi** do computador.
 3. Se não carregar, confira o firewall do computador — ele pode estar
    bloqueando conexões na porta 8000.
 
-Para acesso fora da rede local (de qualquer lugar), seria necessário fazer
-deploy em um servidor (Render, Railway, Fly.io, VPS etc.) — posso ajudar com
-isso quando quiser.
+Isso só é necessário rodando localmente. Pra acesso de qualquer lugar, use o
+link em produção no topo deste README — já está no ar via Render, deploy
+automatizado pelo `render.yaml` na raiz do repositório.
 
 ## Próximos passos sugeridos
 
-- Adicionar mais aeroportos além dos 5 pré-cadastrados (`DEFAULT_AIRPORTS` em
-  `main.py`), ou permitir digitar qualquer ICAO.
+- **NOTAM (fonte oficial)**: chave da API AISWEB (DECEA) já solicitada,
+  pendente de aprovação. Quando chegar, integrar em
+  `backend/app/notam_client.py` seguindo o padrão de `metar_client.py` — vai
+  complementar (não substituir) a leitura de PDF acima, trazendo NOTAM
+  atualizado na hora em vez de depender de um briefing já gerado.
 - Persistir os dados buscados (hoje o cache é só em memória e expira em 1h).
-- Deploy em produção para acesso de qualquer lugar, não só na mesma rede.
