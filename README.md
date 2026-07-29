@@ -4,6 +4,10 @@
 lugar, celular incluso — hospedado no plano grátis do Render, pode levar
 30-50s pra responder após período de inatividade).
 
+**Visão de produto e roadmap original:** `docs/VISAO_E_ROADMAP.md` (inclui
+o design system de referência) — itens de lá ainda não implementados
+entram aos poucos no roadmap abaixo.
+
 Web app para consultar a climatologia de qualquer aeroporto do mundo
 (temperatura, vento, visibilidade em metros e condições de voo
 VFR/MVFR/IFR/LIFR) com base no histórico de observações METAR, além de ATIS
