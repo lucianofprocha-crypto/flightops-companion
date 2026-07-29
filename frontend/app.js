@@ -33,7 +33,15 @@ const $docsResultados = document.getElementById("docs-resultados");
 const $docsOcrAviso = document.getElementById("docs-ocr-aviso");
 const $docsComparacao = document.getElementById("docs-comparacao");
 
+const $btnRelatorio = document.getElementById("gerar-relatorio");
+const $relatorioStatus = document.getElementById("relatorio-status");
+
 let chartCategorias, chartMes, chartHora;
+
+// Últimos resultados de cada análise, guardados em memória pra alimentar o
+// relatório em PDF sem precisar reler os PDFs originais.
+let lastBriefingResult = null;
+let lastDocsResult = null;
 
 const CATEGORY_COLORS = {
   VFR: "#22c55e",
@@ -346,6 +354,7 @@ async function analisarBriefing() {
     }
 
     const data = await resp.json();
+    lastBriefingResult = data;
     renderBriefing(data);
     setBriefingStatus("");
   } catch (err) {
@@ -702,6 +711,7 @@ async function compararDocumentos() {
     }
 
     const data = await resp.json();
+    lastDocsResult = data;
     renderDocsComparison(data);
     setDocsStatus("");
   } catch (err) {
@@ -816,6 +826,52 @@ function renderDocsComparison(data) {
   $docsResultados.classList.remove("hidden");
 }
 
+function setRelatorioStatus(msg, isError = false) {
+  $relatorioStatus.textContent = msg;
+  $relatorioStatus.classList.toggle("error", isError);
+}
+
+async function gerarRelatorio() {
+  if (!lastBriefingResult && !lastDocsResult) {
+    setRelatorioStatus(
+      "Rode a leitura do briefing e/ou a comparação de documentos antes de gerar o relatório.",
+      true
+    );
+    return;
+  }
+
+  $btnRelatorio.disabled = true;
+  setRelatorioStatus("Gerando PDF...");
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/report/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ briefing: lastBriefingResult, travel_docs: lastDocsResult }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `Erro ${resp.status}`);
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "flightops-relatorio.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setRelatorioStatus("");
+  } catch (err) {
+    setRelatorioStatus(`Erro: ${err.message}`, true);
+  } finally {
+    $btnRelatorio.disabled = false;
+  }
+}
+
 $icao.addEventListener("input", () => {
   $icao.value = $icao.value.toUpperCase();
 });
@@ -823,4 +879,5 @@ $icao.addEventListener("input", () => {
 $btn.addEventListener("click", analisar);
 $btnBriefing.addEventListener("click", analisarBriefing);
 $btnDocs.addEventListener("click", compararDocumentos);
+$btnRelatorio.addEventListener("click", gerarRelatorio);
 carregarSugestoes();

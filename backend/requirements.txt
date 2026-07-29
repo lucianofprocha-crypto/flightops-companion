@@ -6,3 +6,4 @@ python-multipart>=0.0.9
 pypdfium2>=4.30
 pytesseract>=0.3.10
 pillow>=10.0
+reportlab>=4.0

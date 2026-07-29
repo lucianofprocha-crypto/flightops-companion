@@ -15,8 +15,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from .atis_client import fetch_atis
@@ -28,6 +29,7 @@ from .metar_client import (
     NoHistoricalDataError,
     fetch_historical_metar,
 )
+from .report_generator import build_report
 from .travel_docs_parser import build_docs_summary
 
 # Limite de tamanho pro upload de briefing (o PDF de exemplo tem ~3.7MB).
@@ -187,6 +189,27 @@ async def compare_travel_docs(
         ) from exc
 
     return summary
+
+
+@app.post("/api/report/generate")
+async def generate_report(payload: dict = Body(...)) -> Response:
+    """Gera um PDF de resumo (Fase 1: texto/tabelas, sem mapa e sem
+    combustível/tripulação/alternados) a partir dos resultados que o
+    frontend já obteve de /api/briefing/upload e/ou /api/traveldocs/compare
+    e reenvia aqui em {"briefing": ..., "travel_docs": ...} (cada chave é
+    opcional). Nenhum PDF é reprocessado — só formata o que já foi lido."""
+    try:
+        pdf_bytes = build_report(payload)
+    except Exception as exc:  # geração de PDF é best-effort; nunca deve travar o usuário
+        raise HTTPException(
+            status_code=422, detail=f"Não foi possível gerar o relatório: {exc}"
+        ) from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="flightops-relatorio.pdf"'},
+    )
 
 
 # Serve o frontend estático na raiz (mesma origem -> funciona em desktop e celular)

@@ -77,6 +77,15 @@ colocar algo funcional de pé, decidi:
   `0`/`O`, `1`/`I`); toda pessoa vinda do eGAR é marcada com `"ocr": true`
   e o app avisa na tela pra conferir visualmente o PDF original quando uma
   divergência envolver o eGAR.
+- **Relatório de pré-voo em PDF (Fase 1):** botão "GERAR RELATÓRIO PDF" que
+  consolida num único PDF o que já foi analisado na página — meteorologia
+  VFR/SVFR/IFR, NOTAMs de fechamento, comparação de rota + checklist de
+  coordenação e a comparação de documentos de tripulação/passageiros.
+  Implementado em `backend/app/report_generator.py` (reportlab), servido
+  por `POST /api/report/generate`. O frontend só reenvia o JSON que os
+  outros endpoints já devolveram — nenhum PDF é relido. **Fase 1** é só
+  texto/tabelas: não inclui o mapa da rota nem dados de combustível,
+  tripulação e alternados da capa do briefing (fica pra uma fase futura).
 
 ## Estrutura
 
@@ -89,6 +98,7 @@ backend/
     atis_client.py   # ATIS ao vivo (atis.info, cobertura EUA)
     briefing_parser.py    # leitura/resumo de PDF de flight briefing
     travel_docs_parser.py # comparação de GEDEC/eAPIS/eGAR
+    report_generator.py   # relatório de pré-voo em PDF (Fase 1)
   requirements.txt
 frontend/
   index.html
@@ -154,3 +164,12 @@ de deploy é o mesmo (push pro GitHub, Render redeploya automaticamente).
   complementar (não substituir) a leitura de PDF acima, trazendo NOTAM
   atualizado na hora em vez de depender de um briefing já gerado.
 - Persistir os dados buscados (hoje o cache é só em memória e expira em 1h).
+- **Relatório em PDF — Fase 2**: replicar o "sketch" visual completo (mapa
+  de rota com FIRs coloridos, combustível, tripulação/SOB e alternados),
+  o que exige (a) ler a capa do briefing (esses dados ainda não são
+  extraídos por `briefing_parser.py`) e (b) uma forma de desenhar o mapa —
+  `cartopy`/`geopandas` não estão disponíveis no ambiente atual, então
+  provavelmente via dados de fronteiras leves + `matplotlib`.
+- **Checklist geral de pré-voo**: lista consolidada de todos os itens que
+  devem ser verificados antes de cada voo (além dos já cobertos pela
+  comparação de rota).
