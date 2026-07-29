@@ -38,8 +38,22 @@ from reportlab.platypus import (
 
 _INK = colors.HexColor("#1a2333")
 _RED = colors.HexColor("#c0392b")
+_GREEN = colors.HexColor("#15803d")
+_AMBER = colors.HexColor("#b45309")
 _GREY = colors.HexColor("#666666")
 _LINE = colors.HexColor("#cccccc")
+
+# Versões em string hex das mesmas cores, pra uso em tags <font color="...">
+# dentro de Paragraph (que não aceita objetos Color do reportlab.lib.colors).
+_INK_HEX = "#1a2333"
+_RED_HEX = "#c0392b"
+_GREEN_HEX = "#15803d"
+_AMBER_HEX = "#b45309"
+_GREY_HEX = "#666666"
+
+# VFR/SVFR/IFR é a classificação de 3 níveis usada em briefing_parser.py
+# (diferente do VFR/MVFR/IFR/LIFR de 4 níveis usado em climatology.py).
+_CATEGORY_COLOR = {"VFR": _GREEN_HEX, "SVFR": _AMBER_HEX, "IFR": _RED_HEX}
 
 
 def _styles():
@@ -59,6 +73,9 @@ def _styles():
     ss.add(ParagraphStyle(name="Body9", parent=ss["Normal"], fontSize=9, leading=12, alignment=TA_LEFT))
     ss.add(ParagraphStyle(name="Small", parent=ss["Normal"], fontSize=7.5, textColor=_GREY, leading=10))
     ss.add(ParagraphStyle(name="Mono", parent=ss["Normal"], fontName="Courier", fontSize=8, leading=10.5))
+    # Estilo pra células de tabela (com wrap — em vez de string crua, que
+    # não quebra linha e vaza pra célula vizinha quando o texto é longo).
+    ss.add(ParagraphStyle(name="Cell", parent=ss["Normal"], fontSize=7.5, leading=9.5, textColor=_INK))
     return ss
 
 
@@ -70,12 +87,16 @@ def _esc(value) -> str:
     return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _bool_icon(value) -> str:
+def _bool_line(label: str, value) -> str:
+    """Linha de checklist colorida: verde/[OK], vermelho/[PENDENTE] ou
+    cinza/[?] quando não dá pra determinar."""
     if value is True:
-        return "[OK]"
-    if value is False:
-        return "[PENDENTE]"
-    return "[?]"
+        icon, color = "[OK]", _GREEN_HEX
+    elif value is False:
+        icon, color = "[PENDENTE]", _RED_HEX
+    else:
+        icon, color = "[?]", _GREY_HEX
+    return f"<font color='{color}'><b>{icon}</b> {_esc(label)}</font>"
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +115,11 @@ def _weather_section(styles, weather: dict | None) -> list:
         role = _esc(s.get("role"))
         icao = _esc(s.get("icao"))
         name = _esc(s.get("name"))
-        header = f"<b>{role}</b> &mdash; {icao} &middot; {name} &mdash; <b>{cat}</b>"
+        cat_color = _CATEGORY_COLOR.get(cat, _GREY_HEX)
+        header = (
+            f"<b>{role}</b> &mdash; {icao} &middot; {name} &mdash; "
+            f"<font color='{cat_color}'><b>{cat}</b></font>"
+        )
         flow.append(Paragraph(header, styles["Body9"]))
         if s.get("metar"):
             flow.append(Paragraph(f"METAR: {_esc(s['metar'])}", styles["Mono"]))
@@ -121,10 +146,18 @@ def _notam_section(styles, notams: dict | None) -> list:
     flow.append(Spacer(1, 4))
 
     for item in notams.get("top_attention", []):
-        status = "VIGENTE" if item.get("active_now") else "fora do periodo"
+        active = bool(item.get("active_now"))
+        status_color = _RED_HEX if active else _GREY_HEX
+        status = "VIGENTE" if active else "fora do periodo"
         ids = ", ".join(item.get("ids", [])[:5])
         icaos = ", ".join(item.get("icaos", []))
-        title = f"<b>{_esc(item.get('title'))}</b> [{_esc(item.get('category'))}] &mdash; {status}"
+        # Fechamento (pista/táxi/aeródromo) sempre em vermelho pra chamar
+        # atenção — essa seção já só mostra esse tipo de NOTAM.
+        title = (
+            f"<font color='{_RED_HEX}'><b>{_esc(item.get('title'))}</b></font> "
+            f"[{_esc(item.get('category'))}] &mdash; "
+            f"<font color='{status_color}'><b>{status}</b></font>"
+        )
         flow.append(Paragraph(title, styles["Body9"]))
         meta = " &middot; ".join(x for x in [_esc(ids), _esc(icaos)] if x)
         if meta:
@@ -164,10 +197,15 @@ def _route_section(styles, route: dict | None) -> list:
 
     if comparison and comparison.get("available"):
         if comparison.get("match"):
-            flow.append(Paragraph("<b>Rotas identicas.</b>", styles["Body9"]))
+            flow.append(Paragraph(f"<font color='{_GREEN_HEX}'><b>Rotas identicas.</b></font>", styles["Body9"]))
         else:
             pct = round((comparison.get("similarity") or 0) * 100)
-            flow.append(Paragraph(f"<b>Divergencia entre as rotas</b> &mdash; similaridade {pct}%.", styles["Body9"]))
+            flow.append(
+                Paragraph(
+                    f"<font color='{_RED_HEX}'><b>Divergencia entre as rotas</b></font> &mdash; similaridade {pct}%.",
+                    styles["Body9"],
+                )
+            )
             removed = []
             added = []
             for d in comparison.get("diff", []):
@@ -203,7 +241,7 @@ def _checklist_section(styles, route: dict | None) -> list:
         linhas.append(("Rota do plano confere com o briefing", comparison.get("match")))
 
     for label, value in linhas:
-        flow.append(Paragraph(f"{_bool_icon(value)} {_esc(label)}", styles["Body9"]))
+        flow.append(Paragraph(_bool_line(label, value), styles["Body9"]))
 
     for icao, val in (plan.get("slots") or {}).items():
         flow.append(Paragraph(f"Slot {_esc(icao)}: {_esc(val)}", styles["Body9"]))
@@ -222,9 +260,6 @@ def _checklist_section(styles, route: dict | None) -> list:
 # ---------------------------------------------------------------------------
 # Secao de documentos de tripulacao/passageiros
 # ---------------------------------------------------------------------------
-
-_DOC_FIELD_COLS = {"name": 1, "nationality": 2, "document_number": 3, "dob_iso": 4}
-
 
 def _docs_section(styles, docs: dict | None) -> list:
     flow = [Paragraph("Documentos de tripulacao/passageiros", styles["H2FO"])]
@@ -246,14 +281,29 @@ def _docs_section(styles, docs: dict | None) -> list:
     for group in comparison:
         people = group.get("people", [])
         name = max((p.get("name") or "" for p in people), key=len, default="(sem nome)")
-        status = "DIVERGENCIA" if group.get("has_issue") else "confere"
-        flow.append(Paragraph(f"<b>{_esc(name)}</b> &mdash; {status}", styles["Body9"]))
+        has_issue = bool(group.get("has_issue"))
+        status_color = _RED_HEX if has_issue else _GREEN_HEX
+        status = "DIVERGENCIA" if has_issue else "confere"
+        flow.append(
+            Paragraph(
+                f"<b>{_esc(name)}</b> &mdash; <font color='{status_color}'><b>{status}</b></font>",
+                styles["Body9"],
+            )
+        )
         if group.get("missing_from"):
             flow.append(Paragraph(f"Ausente em: {_esc(', '.join(group['missing_from']))}", styles["Small"]))
         flow.append(Spacer(1, 2))
 
-        data = [["Documento", "Nome", "Nacionalidade", "Documento no", "Nascimento"]]
         mism = set(group.get("mismatched_fields", []))
+
+        def _cell(value, mismatched: bool) -> Paragraph:
+            text = _esc(value if value not in (None, "") else "-")
+            if mismatched:
+                text = f"<font color='{_RED_HEX}'><b>{text}</b></font>"
+            return Paragraph(text, styles["Cell"])
+
+        header = ["Documento", "Nome", "Nacionalidade", "Documento no", "Nascimento"]
+        data = [header]
         for p in people:
             doc_label = p.get("_doc", "")
             if p.get("ocr"):
@@ -261,31 +311,34 @@ def _docs_section(styles, docs: dict | None) -> list:
             dob = p.get("dob_iso") or p.get("dob_raw") or "-"
             data.append(
                 [
-                    doc_label,
-                    p.get("name") or "-",
-                    p.get("nationality") or "-",
-                    p.get("document_number") or "-",
-                    dob,
+                    Paragraph(_esc(doc_label), styles["Cell"]),
+                    _cell(p.get("name"), "name" in mism),
+                    _cell(p.get("nationality"), "nationality" in mism),
+                    _cell(p.get("document_number"), "document_number" in mism),
+                    _cell(dob, "dob_iso" in mism),
                 ]
             )
 
-        table = Table(data, colWidths=[30 * mm, 42 * mm, 24 * mm, 28 * mm, 26 * mm], repeatRows=1)
-        style_cmds = [
-            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("BACKGROUND", (0, 0), (-1, 0), _INK),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.5, _LINE),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ]
-        for field in mism:
-            col = _DOC_FIELD_COLS.get(field)
-            if col is not None:
-                style_cmds.append(("TEXTCOLOR", (col, 1), (col, -1), _RED))
-                style_cmds.append(("FONTNAME", (col, 1), (col, -1), "Helvetica-Bold"))
-        table.setStyle(TableStyle(style_cmds))
+        # Colunas somam 150mm (cabem nos 178mm úteis de uma A4 com margens
+        # de 16mm) — nomes/rótulos longos quebram linha (Paragraph) em vez
+        # de vazar pra célula vizinha.
+        table = Table(data, colWidths=[32 * mm, 44 * mm, 24 * mm, 26 * mm, 24 * mm], repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("FONTSIZE", (0, 0), (-1, 0), 7.5),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("BACKGROUND", (0, 0), (-1, 0), _INK),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.5, _LINE),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
         flow.append(table)
         flow.append(Spacer(1, 9))
 

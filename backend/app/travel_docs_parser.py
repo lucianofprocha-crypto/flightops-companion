@@ -21,6 +21,7 @@ documento sempre deve ser conferido visualmente em caso de divergência.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from io import BytesIO
@@ -471,10 +472,18 @@ def parse_egar(pdf_bytes: bytes) -> dict:
 _COMPARE_FIELDS = ["name", "nationality", "document_number", "dob_iso"]
 
 
+def _strip_accents(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+
 def _name_tokens(name: str | None) -> set[str]:
+    """Tokeniza um nome pra comparação — maiúsculas e sem acento, pra não
+    marcar como divergência algo que é só diferença de grafia entre
+    documentos (ex: GEDEC em CAIXA ALTA sem acento "JOAO" vs a lista de
+    passageiros com acento "João")."""
     if not name:
         return set()
-    cleaned = re.sub(r"[^A-ZÀ-Ÿ ]", "", name.upper())
+    cleaned = re.sub(r"[^A-Z ]", "", _strip_accents(name.upper()))
     return set(t for t in cleaned.split() if len(t) > 1)
 
 
@@ -511,20 +520,31 @@ def compare_people(people_by_doc: dict[str, list[dict]]) -> list[dict]:
         group = [p]
         used[i] = True
         p_tokens = _name_tokens(p.get("name"))
+        p_dob = p.get("dob_iso")
         for j in range(i + 1, len(flat)):
             if used[j]:
                 continue
             q = flat[j]
             if q["_doc"] == p["_doc"]:
                 continue
-            match = False
-            if p.get("dob_iso") and q.get("dob_iso"):
-                match = p["dob_iso"] == q["dob_iso"]
-            if not match:
+            q_dob = q.get("dob_iso")
+            if p_dob and q_dob:
+                # Os dois lados têm data de nascimento — é o sinal mais
+                # confiável que temos, então a decisão é só dele. Importante
+                # NÃO cair pro nome quando as datas são conhecidas e
+                # diferentes: parentes com sobrenome em comum (ex: "MARIA
+                # ROLIM MACHADO" x "JOAO ROLIM MACHADO") facilmente batem
+                # >=50% de sobreposição de palavras e seriam misturados
+                # como se fossem a mesma pessoa.
+                match = p_dob == q_dob
+            else:
+                # Pelo menos um lado sem DOB (ex: falha de OCR/parse) — só
+                # resta comparar nomes, com o risco de falso positivo entre
+                # parentes descrito acima.
                 q_tokens = _name_tokens(q.get("name"))
-                if p_tokens and q_tokens:
-                    overlap = len(p_tokens & q_tokens) / max(1, len(p_tokens | q_tokens))
-                    match = overlap >= 0.5
+                match = bool(p_tokens and q_tokens) and (
+                    len(p_tokens & q_tokens) / max(1, len(p_tokens | q_tokens)) >= 0.5
+                )
             if match:
                 group.append(q)
                 used[j] = True
