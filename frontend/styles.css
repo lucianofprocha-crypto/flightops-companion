@@ -479,3 +479,169 @@ textarea {
   word-break: break-word;
   max-width: 100%;
 }
+
+/* Eventos abaixo dos mínimos */
+
+.heatmap-scroll {
+  overflow-x: auto;
+}
+
+.heatmap-table {
+  border-collapse: collapse;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.heatmap-table th {
+  padding: 3px 4px;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+.heatmap-table th.heatmap-hour-label {
+  text-align: right;
+  padding-right: 6px;
+}
+
+.heatmap-cell {
+  width: 20px;
+  height: 16px;
+  text-align: center;
+  border-radius: 2px;
+  color: var(--text);
+}
+
+.mes-select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.calendar-weekday {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.calendar-day.empty {
+  background: transparent;
+  border: none;
+}
+
+.calendar-day.green {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--vfr);
+  border-color: transparent;
+}
+
+.calendar-day.yellow {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--ifr);
+  border-color: transparent;
+}
+
+.calendar-day.red {
+  background: rgba(239, 68, 68, 0.22);
+  color: var(--lifr);
+  border-color: transparent;
+}
+
+.calendar-day.nodata {
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+.events-list-scroll {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.events-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.events-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--card-bg);
+}
+
+.events-table td {
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.events-table tr:last-child td {
+  border-bottom: none;
+}
+
+.events-table tr.event-row {
+  cursor: pointer;
+}
+
+.events-table tr.event-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.events-table tr.event-row.selected {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.events-table td.worst-lifr {
+  color: var(--lifr);
+  font-weight: 700;
+}
+
+.events-table td.worst-ifr {
+  color: var(--ifr);
+  font-weight: 700;
+}
+
+.metar-drilldown-item {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.metar-drilldown-item:last-child {
+  border-bottom: none;
+}
+
+.metar-drilldown-item.context {
+  color: var(--muted);
+}

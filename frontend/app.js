@@ -36,7 +36,23 @@ const $docsComparacao = document.getElementById("docs-comparacao");
 const $btnRelatorio = document.getElementById("gerar-relatorio");
 const $relatorioStatus = document.getElementById("relatorio-status");
 
-let chartCategorias, chartMes, chartHora;
+const $eventsResultados = document.getElementById("events-resultados");
+const $evDisponibilidade = document.getElementById("ev-disponibilidade");
+const $evHoras = document.getElementById("ev-horas");
+const $evContagem = document.getElementById("ev-contagem");
+const $evMaior = document.getElementById("ev-maior");
+const $evMenorVis = document.getElementById("ev-menorvis");
+const $evMenorTeto = document.getElementById("ev-menorteto");
+const $eventsHeatmap = document.getElementById("events-heatmap");
+const $eventsMesSelect = document.getElementById("events-mes-select");
+const $eventsCalendario = document.getElementById("events-calendario");
+const $eventsLista = document.getElementById("events-lista");
+const $eventsDetalheCard = document.getElementById("events-detalhe-card");
+const $eventsDetalheResumo = document.getElementById("events-detalhe-resumo");
+const $eventsDetalheMetars = document.getElementById("events-detalhe-metars");
+
+let chartCategorias, chartMes, chartHora, chartEventoDetalhe;
+let lastEventsData = null;
 
 // Últimos resultados de cada análise, guardados em memória pra alimentar o
 // relatório em PDF sem precisar reler os PDFs originais.
@@ -100,11 +116,13 @@ async function analisar() {
   $resultados.classList.add("hidden");
   $semDados.classList.add("hidden");
   $atisCard.classList.add("hidden");
+  $eventsResultados.classList.add("hidden");
   setStatus(`Buscando histórico METAR de ${icao} (${periodoLabel(periodo)})...`);
 
-  // ATIS é só um complemento (só existe pra parte dos aeroportos dos EUA) —
-  // buscamos em paralelo e nunca deixamos ele travar a análise principal.
+  // ATIS e eventos abaixo dos mínimos são complementos — buscamos em
+  // paralelo e nunca deixamos eles travarem a análise principal.
   buscarAtis(icao);
+  buscarEventos(icao, periodo);
 
   try {
     const resp = await fetch(
@@ -308,6 +326,295 @@ function renderChartHora(byHour) {
       plugins: { legend: { display: false } },
     },
   });
+}
+
+async function buscarEventos(icao, periodo) {
+  try {
+    const resp = await fetch(
+      `${API_BASE}/api/events?icao=${encodeURIComponent(icao)}&period=${encodeURIComponent(periodo)}`
+    );
+    if (!resp.ok) {
+      $eventsResultados.classList.add("hidden");
+      return;
+    }
+    const data = await resp.json();
+    renderEvents(data);
+  } catch (err) {
+    // Silencioso: eventos são um complemento, não devem travar a análise principal.
+    $eventsResultados.classList.add("hidden");
+  }
+}
+
+function formatMinutosLabel(minutos) {
+  if (minutos < 60) return `${minutos} min`;
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  return `${h}h${String(m).padStart(2, "0")}`;
+}
+
+function renderEvents(data) {
+  lastEventsData = data;
+
+  $evDisponibilidade.textContent = `${data.headline.availability_pct}%`;
+  $evHoras.textContent = `${data.headline.hours_below_minima} h`;
+  $evContagem.textContent = data.headline.event_count;
+  $evMaior.textContent = data.headline.longest_event_label;
+  $evMenorVis.textContent =
+    data.headline.min_visibility_m != null ? `${data.headline.min_visibility_m.toLocaleString("pt-BR")} m` : "—";
+  $evMenorTeto.textContent = data.headline.min_ceiling_ft != null ? `${data.headline.min_ceiling_ft} ft` : "—";
+
+  renderHeatmap(data.heatmap);
+  popularSeletorMes(data.calendar);
+  renderEventsList(data.events);
+
+  $eventsDetalheCard.classList.add("hidden");
+  $eventsResultados.classList.remove("hidden");
+}
+
+function renderHeatmap(heatmap) {
+  $eventsHeatmap.innerHTML = "";
+
+  const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const table = document.createElement("table");
+  table.className = "heatmap-table";
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  headRow.appendChild(document.createElement("th"));
+  for (const m of meses) {
+    const th = document.createElement("th");
+    th.textContent = m;
+    headRow.appendChild(th);
+  }
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (let hour = 0; hour < 24; hour++) {
+    const tr = document.createElement("tr");
+    const thHour = document.createElement("th");
+    thHour.className = "heatmap-hour-label";
+    thHour.textContent = `${String(hour).padStart(2, "0")}h`;
+    tr.appendChild(thHour);
+
+    for (let month = 1; month <= 12; month++) {
+      const cellData = heatmap[String(month)]?.[String(hour)];
+      const td = document.createElement("td");
+      const pct = cellData ? cellData.below_minima_pct : 0;
+      const hasData = cellData && cellData.count > 0;
+      const cell = document.createElement("div");
+      cell.className = "heatmap-cell";
+      if (hasData) {
+        const alpha = Math.min(1, pct / 100);
+        cell.style.background = `rgba(239, 68, 68, ${(0.08 + alpha * 0.85).toFixed(2)})`;
+        cell.title = `${meses[month - 1]} ${String(hour).padStart(2, "0")}h — ${pct}% abaixo dos mínimos (${cellData.count} obs.)`;
+      } else {
+        cell.style.background = "transparent";
+        cell.title = `${meses[month - 1]} ${String(hour).padStart(2, "0")}h — sem dados`;
+      }
+      td.appendChild(cell);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  $eventsHeatmap.appendChild(table);
+}
+
+function popularSeletorMes(calendar) {
+  const meses = [...new Set(Object.keys(calendar).map((d) => d.slice(0, 7)))].sort();
+  const anterior = $eventsMesSelect.value;
+  $eventsMesSelect.innerHTML = "";
+
+  const nomesMes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  for (const mesKey of meses) {
+    const [ano, mes] = mesKey.split("-");
+    const opt = document.createElement("option");
+    opt.value = mesKey;
+    opt.textContent = `${nomesMes[parseInt(mes, 10) - 1]} ${ano}`;
+    $eventsMesSelect.appendChild(opt);
+  }
+
+  const selecionado = meses.includes(anterior) ? anterior : meses[meses.length - 1];
+  if (selecionado) {
+    $eventsMesSelect.value = selecionado;
+    renderCalendar(calendar, selecionado);
+  } else {
+    $eventsCalendario.innerHTML = "";
+  }
+}
+
+function renderCalendar(calendar, mesKey) {
+  $eventsCalendario.innerHTML = "";
+
+  const [ano, mes] = mesKey.split("-").map((v) => parseInt(v, 10));
+  const primeiroDia = new Date(Date.UTC(ano, mes - 1, 1));
+  const diasNoMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  const offset = primeiroDia.getUTCDay(); // 0 = domingo
+
+  for (const w of ["D", "S", "T", "Q", "Q", "S", "S"]) {
+    const el = document.createElement("div");
+    el.className = "calendar-weekday";
+    el.textContent = w;
+    $eventsCalendario.appendChild(el);
+  }
+
+  for (let i = 0; i < offset; i++) {
+    const el = document.createElement("div");
+    el.className = "calendar-day empty";
+    $eventsCalendario.appendChild(el);
+  }
+
+  for (let dia = 1; dia <= diasNoMes; dia++) {
+    const dateKey = `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+    const info = calendar[dateKey];
+    const el = document.createElement("div");
+    el.textContent = dia;
+    if (!info) {
+      el.className = "calendar-day nodata";
+      el.title = "Sem dados";
+    } else {
+      el.className = `calendar-day ${info.status}`;
+      el.title = `${info.minutes_below_minima} min abaixo dos mínimos (${info.observation_count} obs.)`;
+    }
+    $eventsCalendario.appendChild(el);
+  }
+}
+
+function renderEventsList(events) {
+  $eventsLista.innerHTML = "";
+
+  if (!events.length) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = "Nenhum evento abaixo dos mínimos neste período.";
+    $eventsLista.appendChild(p);
+    return;
+  }
+
+  const table = document.createElement("table");
+  table.className = "events-table";
+
+  const thead = document.createElement("thead");
+  thead.innerHTML =
+    "<tr><th>Data</th><th>Início</th><th>Fim</th><th>Duração</th><th>Causa</th><th>Pior cat.</th></tr>";
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  events.forEach((evento, idx) => {
+    const tr = document.createElement("tr");
+    tr.className = "event-row";
+    tr.dataset.index = idx;
+
+    const start = new Date(evento.start);
+    const end = new Date(evento.end);
+    const dataStr = start.toISOString().slice(0, 10).split("-").reverse().join("/");
+    const inicioStr = start.toISOString().slice(11, 16) + "Z";
+    const fimStr = end.toISOString().slice(11, 16) + "Z" + (evento.end_uncertain ? " (?)" : "");
+
+    tr.innerHTML = `
+      <td>${dataStr}</td>
+      <td>${inicioStr}</td>
+      <td>${fimStr}</td>
+      <td>${evento.duration_label}</td>
+      <td>${evento.cause || "—"}</td>
+      <td class="worst-${evento.worst_category.toLowerCase()}">${evento.worst_category}</td>
+    `;
+    tr.addEventListener("click", () => selecionarEvento(idx));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  $eventsLista.appendChild(table);
+}
+
+function selecionarEvento(idx) {
+  if (!lastEventsData) return;
+  const evento = lastEventsData.events[idx];
+  if (!evento) return;
+
+  for (const row of $eventsLista.querySelectorAll("tr.event-row")) {
+    row.classList.toggle("selected", parseInt(row.dataset.index, 10) === idx);
+  }
+
+  renderEventDetail(evento);
+}
+
+function renderEventDetail(evento) {
+  $eventsDetalheCard.classList.remove("hidden");
+
+  const resumoPartes = [
+    `Pior categoria: ${evento.worst_category}`,
+    evento.min_visibility_m != null ? `menor vis. ${evento.min_visibility_m} m` : null,
+    evento.min_ceiling_ft != null ? `menor teto ${evento.min_ceiling_ft} ft` : null,
+    evento.cause ? `causa provável: ${evento.cause}` : null,
+    evento.end_uncertain ? "fim estimado incerto (gap nos dados ou evento em aberto)" : null,
+  ].filter(Boolean);
+  $eventsDetalheResumo.textContent = resumoPartes.join(" · ");
+
+  const labels = evento.observations.map((o) => o.valid.slice(11, 16) + "Z");
+  const visData = evento.observations.map((o) => o.visibility_m);
+  const ceilData = evento.observations.map((o) => o.ceiling_ft);
+
+  chartEventoDetalhe?.destroy();
+  chartEventoDetalhe = new Chart(document.getElementById("events-detalhe-chart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Visibilidade (m)",
+          data: visData,
+          borderColor: "#3b82f6",
+          backgroundColor: "transparent",
+          yAxisID: "y",
+          tension: 0.2,
+        },
+        {
+          label: "Teto (ft)",
+          data: ceilData,
+          borderColor: "#f59e0b",
+          backgroundColor: "transparent",
+          yAxisID: "y1",
+          tension: 0.2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { color: "#93a2b8" }, grid: { color: "#2a3548" } },
+        y: {
+          position: "left",
+          ticks: { color: "#93a2b8" },
+          grid: { color: "#2a3548" },
+          title: { display: true, text: "m", color: "#93a2b8" },
+        },
+        y1: {
+          position: "right",
+          ticks: { color: "#93a2b8" },
+          grid: { display: false },
+          title: { display: true, text: "ft", color: "#93a2b8" },
+        },
+      },
+      plugins: { legend: { labels: { color: "#e8edf5" } } },
+    },
+  });
+
+  $eventsDetalheMetars.innerHTML = "";
+  const label = document.createElement("div");
+  label.className = "weather-field-label";
+  label.textContent = "METAR/SPECI (observação a observação — não há dado minuto a minuto)";
+  $eventsDetalheMetars.appendChild(label);
+
+  for (const o of evento.observations) {
+    const div = document.createElement("div");
+    div.className = "metar-drilldown-item" + (o.context ? " context" : "");
+    div.textContent = o.raw_metar + (o.context ? "  (recuperação — fora do evento)" : "");
+    $eventsDetalheMetars.appendChild(div);
+  }
+
+  $eventsDetalheCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function setBriefingStatus(msg, isError = false) {
@@ -880,4 +1187,7 @@ $btn.addEventListener("click", analisar);
 $btnBriefing.addEventListener("click", analisarBriefing);
 $btnDocs.addEventListener("click", compararDocumentos);
 $btnRelatorio.addEventListener("click", gerarRelatorio);
+$eventsMesSelect.addEventListener("change", () => {
+  if (lastEventsData) renderCalendar(lastEventsData.calendar, $eventsMesSelect.value);
+});
 carregarSugestoes();

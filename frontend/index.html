@@ -94,6 +94,68 @@
       </div>
     </section>
 
+    <section id="events-resultados" class="results hidden">
+      <div class="card">
+        <h3>Eventos abaixo dos mínimos (IFR/LIFR)</h3>
+        <p class="muted" style="margin-top:-4px;">
+          "Abaixo dos mínimos" aqui = IFR ou LIFR (teto &lt; 1000ft ou visibilidade &lt; 3sm) — referência genérica, não o mínimo operacional de nenhuma aeronave/procedimento específico.
+        </p>
+        <div class="metrics-grid">
+          <div class="metric">
+            <span class="metric-label">Disponibilidade (acima dos mínimos)</span>
+            <span class="metric-value" id="ev-disponibilidade">&mdash;</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Horas abaixo dos mínimos</span>
+            <span class="metric-value" id="ev-horas">&mdash;</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Eventos</span>
+            <span class="metric-value" id="ev-contagem">&mdash;</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Maior evento</span>
+            <span class="metric-value" id="ev-maior">&mdash;</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Menor visibilidade</span>
+            <span class="metric-value" id="ev-menorvis">&mdash;</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Menor teto</span>
+            <span class="metric-value" id="ev-menorteto">&mdash;</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="overflow: hidden; max-width: 100%;">
+        <h3>Heatmap — mês x hora (% abaixo dos mínimos)</h3>
+        <div id="events-heatmap" class="heatmap-scroll"></div>
+      </div>
+
+      <div class="card" style="overflow: hidden; max-width: 100%;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+          <h3 style="margin:0;">Calendário</h3>
+          <select id="events-mes-select" class="mes-select"></select>
+        </div>
+        <div id="events-calendario" class="calendar-grid"></div>
+      </div>
+
+      <div class="card" style="overflow: hidden; max-width: 100%;">
+        <h3>Lista de eventos</h3>
+        <div id="events-lista" class="events-list-scroll"></div>
+      </div>
+
+      <div id="events-detalhe-card" class="card hidden" style="overflow: hidden; max-width: 100%;">
+        <h3>Detalhe do evento</h3>
+        <div id="events-detalhe-resumo" class="muted" style="margin-bottom:8px;"></div>
+        <div class="chart-container" style="height:220px;">
+          <canvas id="events-detalhe-chart"></canvas>
+        </div>
+        <div id="events-detalhe-metars" style="margin-top:10px;"></div>
+      </div>
+    </section>
+
     <section class="card form-card">
       <h2>Leitura de flight briefing (PDF)</h2>
       <p class="muted">Envie o PDF de despacho (ex: ForeFlight) para extrair automaticamente METAR/TAF/SIGMET e os principais pontos de atenção dos NOTAMs.</p>

@@ -26,9 +26,11 @@ from .climatology import compute_climatology
 from .metar_client import (
     PERIOD_TO_DAYS,
     MetarFetchError,
+    MetarObservation,
     NoHistoricalDataError,
     fetch_historical_metar,
 )
+from .minima_events import build_events_summary
 from .report_generator import build_report
 from .travel_docs_parser import build_docs_summary
 
@@ -52,9 +54,25 @@ SUGGESTED_AIRPORTS = ["SBJH", "SBKP", "SBGR", "SBSJ", "SBSP", "KJFK", "EGLL", "O
 _CACHE: dict[tuple[str, str], tuple[float, dict]] = {}
 _CACHE_TTL_SECONDS = 60 * 60  # 1 hora
 
+# Cache das observações brutas (mesma chave) — compartilhado entre
+# /api/climatology e /api/events pra não buscar o histórico duas vezes no
+# IEM Mesonet quando o usuário consulta os dois pro mesmo ICAO/período.
+_OBS_CACHE: dict[tuple[str, str], tuple[float, list[MetarObservation]]] = {}
+
 # ATIS é dado ao vivo — cache bem mais curto.
 _ATIS_CACHE: dict[str, tuple[float, list[dict]]] = {}
 _ATIS_CACHE_TTL_SECONDS = 5 * 60  # 5 minutos
+
+
+def _get_observations(icao: str, period: str) -> list[MetarObservation]:
+    cache_key = (icao, period)
+    cached = _OBS_CACHE.get(cache_key)
+    if cached and (time.time() - cached[0]) < _CACHE_TTL_SECONDS:
+        return cached[1]
+
+    observations = fetch_historical_metar(icao, period)
+    _OBS_CACHE[cache_key] = (time.time(), observations)
+    return observations
 
 
 @app.get("/api/airports")
@@ -97,7 +115,7 @@ def get_climatology(
         return cached[1]
 
     try:
-        observations = fetch_historical_metar(icao, period)
+        observations = _get_observations(icao, period)
         result = compute_climatology(icao, period, observations)
     except NoHistoricalDataError as exc:
         # Fonte respondeu normalmente, mas não há histórico para este ICAO.
@@ -109,6 +127,38 @@ def get_climatology(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     _CACHE[cache_key] = (time.time(), result)
+    return result
+
+
+@app.get("/api/events")
+def get_events(
+    icao: str = Query(..., min_length=4, max_length=4),
+    period: str = Query("365d"),
+) -> dict:
+    """Eventos abaixo dos mínimos (IFR/LIFR): heatmap mês x hora,
+    calendário diário (verde/amarelo/vermelho) e a lista de eventos com
+    início, fim estimado, duração, causa provável e as observações
+    (METAR/SPECI) de cada um, para drill-down. Ver docstring de
+    minima_events.py para os critérios usados."""
+    icao = icao.upper()
+    period = period.lower()
+
+    if period not in PERIOD_TO_DAYS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"período inválido. Use um de: {list(PERIOD_TO_DAYS.keys())}",
+        )
+
+    try:
+        observations = _get_observations(icao, period)
+        result = build_events_summary(icao, period, observations)
+    except NoHistoricalDataError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except MetarFetchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     return result
 
 

@@ -55,13 +55,17 @@ crescendo sem precisar reescrever o sistema:
   possível fonte futura*
 - ✅ Salvar no banco — *hoje o cache é só em memória (TTL de 1h), sem
   persistência permanente ainda*
-- ⬜ **Calcular eventos abaixo dos mínimos** (heatmap por
-  mês×hora, calendário mensal com dias 🟢🟡🔴, lista de
-  eventos com causa/duração, drill-down por evento com METAR/SPECI e
-  gráfico de visibilidade/teto minuto a minuto) — **não implementado**;
-  hoje o app mostra estatísticas agregadas (% VFR/MVFR/IFR/LIFR por mês
-  e por hora), mas não a lista de eventos individuais nem o heatmap
-  granular nem o drill-down
+- ✅ **Calcular eventos abaixo dos mínimos** (heatmap por mês×hora,
+  calendário mensal com dias 🟢🟡🔴, lista de eventos com
+  causa/duração, drill-down por evento com METAR/SPECI e gráfico de
+  visibilidade/teto) — **implementado em 30/07/2026** em
+  `backend/app/minima_events.py` + `GET /api/events`. Duas diferenças
+  em relação ao pedido original: (1) "abaixo dos mínimos" foi definido
+  como IFR/LIFR (mesmo limiar já usado em "condições adversas" no
+  resto do app), não o mínimo real de nenhuma aeronave/procedimento
+  específico; (2) o gráfico do evento é observação a observação (METAR
+  reporta de hora em hora + specials), não minuto a minuto — não temos
+  granularidade menor que isso na fonte de dados
 - ✅ Dashboard — *versão simplificada (gráficos de categoria/mês/hora)*
 - ⬜ Exportar Excel — não implementado
 - ⬜ Exportar PDF do Airport Intelligence — não implementado *(existe
@@ -118,6 +122,8 @@ priorizando o que o usuário mais precisava no dia a dia:
 
 - Climatologia estatística por ICAO livre (VFR/MVFR/IFR/LIFR por
   mês/hora) + ATIS ao vivo (cobertura EUA)
+- Eventos abaixo dos mínimos: heatmap, calendário, lista de eventos e
+  drill-down com METAR/SPECI + gráfico de visibilidade/teto
 - Leitura de flight briefing em PDF: METAR/TAF/SIGMET, NOTAM
   (fechamentos de pista/táxi/aeródromo), comparação de rota
   (briefing × plano apresentado) + checklist de coordenação

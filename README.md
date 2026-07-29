@@ -44,6 +44,20 @@ colocar algo funcional de pé, decidi:
   digital da FAA, gratuito, sem API key). Cobertura é praticamente só EUA —
   fora de lá, o card de ATIS simplesmente não aparece (não é tratado como
   erro). `backend/app/atis_client.py`.
+- **Eventos abaixo dos mínimos:** a partir do mesmo histórico METAR
+  buscado pra climatologia, `backend/app/minima_events.py` identifica
+  sequências contínuas de observações em IFR/LIFR ("abaixo dos
+  mínimos" — não é o mínimo real de nenhuma aeronave/procedimento
+  específico, é uma referência genérica) e monta: estatísticas gerais
+  (disponibilidade, horas abaixo dos mínimos, nº de eventos, maior
+  evento, menor visibilidade/teto), um heatmap mês×hora, um calendário
+  mensal (verde/amarelo/vermelho) e a lista de eventos com
+  início/fim/duração/causa provável — clicando num evento, mostra as
+  observações (METAR/SPECI) dele e um gráfico de visibilidade/teto
+  observação a observação (não é granularidade de minuto a minuto, já
+  que METAR não reporta assim). Servido por `GET /api/events`,
+  aparece automaticamente junto do resultado do "ANALISAR" na tela
+  inicial.
 - **NOTAM (fonte oficial):** ainda não integrado. A fonte planejada é a API
   AISWEB do DECEA (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo
   brasileiro) — chave de API já solicitada, pendente de aprovação. Quando
@@ -99,6 +113,7 @@ backend/
     main.py          # API FastAPI + serve o frontend
     metar_client.py  # busca histórico no IEM Mesonet
     climatology.py   # cálculo das estatísticas
+    minima_events.py # eventos abaixo dos mínimos (heatmap/calendário/lista)
     atis_client.py   # ATIS ao vivo (atis.info, cobertura EUA)
     briefing_parser.py    # leitura/resumo de PDF de flight briefing
     travel_docs_parser.py # comparação de GEDEC/eAPIS/eGAR
