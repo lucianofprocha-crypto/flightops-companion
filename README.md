@@ -80,6 +80,15 @@ colocar algo funcional de pé, decidi:
   calcula esses dados hoje e preferimos não simular números numa
   ferramenta de decisão operacional; ficam como candidatos a entrar
   quando houver uma fonte de dados real.
+- **Checklist geral de pré-voo:** card no Dashboard com itens
+  automáticos (briefing lido, meteorologia sem IFR nos aeródromos do
+  briefing, NOTAMs revisados, rota confere, handling confirmado, FPL
+  aprovado/OK, documentos sem divergência — a partir do que já foi
+  analisado, sem chamada nova) e itens manuais fixos (documentação da
+  aeronave, peso e balanceamento, combustível, briefing de tripulação,
+  bagagem/carga, equipamentos de emergência), marcáveis e salvos no
+  navegador (`localStorage`). Não é um checklist oficial de
+  aeronave/operador — é um lembrete geral.
 - **NOTAM (fonte oficial):** ainda não integrado. A fonte planejada é a API
   AISWEB do DECEA (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo
   brasileiro) — chave de API já solicitada, pendente de aprovação. Quando
@@ -212,6 +221,5 @@ de deploy é o mesmo (push pro GitHub, Render redeploya automaticamente).
   extraídos por `briefing_parser.py`) e (b) uma forma de desenhar o mapa —
   `cartopy`/`geopandas` não estão disponíveis no ambiente atual, então
   provavelmente via dados de fronteiras leves + `matplotlib`.
-- **Checklist geral de pré-voo**: lista consolidada de todos os itens que
-  devem ser verificados antes de cada voo (além dos já cobertos pela
-  comparação de rota).
+- ~~**Checklist geral de pré-voo**~~ — **implementado em 30/07/2026**, ver
+  seção de recursos acima.

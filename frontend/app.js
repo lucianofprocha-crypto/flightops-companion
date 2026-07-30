@@ -691,6 +691,7 @@ function renderBriefing(data) {
   renderChecklist(data.route);
   $briefingResultados.classList.remove("hidden");
   updateDashBriefing(data);
+  renderChecklistGeralAuto();
 }
 
 function renderBriefingWeather(weather) {
@@ -1146,6 +1147,7 @@ function renderDocsComparison(data) {
 
   $docsResultados.classList.remove("hidden");
   updateDashDispatch(data);
+  renderChecklistGeralAuto();
 }
 
 function setRelatorioStatus(msg, isError = false) {
@@ -1290,6 +1292,110 @@ function updateDashBriefing(data) {
   document.getElementById("dash-dot-briefing").className = "dash-status-dot " + dotCls;
 }
 
+// Checklist geral de pré-voo (Dashboard) — combina itens automáticos
+// (derivados do briefing/documentos já analisados nesta sessão) com itens
+// manuais fixos, persistidos por navegador via localStorage.
+
+function renderChecklistGeralAuto() {
+  const container = document.getElementById("checklist-geral-auto");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const briefing = lastBriefingResult;
+  const route = briefing ? briefing.route : null;
+  const plan = route ? route.plan : null;
+  const cmp = route ? route.comparison : null;
+  const docs = lastDocsResult;
+
+  addChecklistItem(container, briefing ? true : null, "Briefing de voo lido");
+
+  let meteoOk = null;
+  if (briefing && briefing.weather && briefing.weather.stations && briefing.weather.stations.length) {
+    meteoOk = !briefing.weather.stations.some((s) => s.category === "IFR");
+  }
+  addChecklistItem(container, meteoOk, "Meteorologia sem IFR nos aeródromos do briefing");
+
+  if (briefing) {
+    const count = briefing.notams ? briefing.notams.active_now || 0 : 0;
+    addChecklistItem(container, true, `NOTAMs de fechamento revisados (${count} vigente${count === 1 ? "" : "s"})`);
+  } else {
+    addChecklistItem(container, null, "NOTAMs de fechamento revisados");
+  }
+
+  addChecklistItem(container, cmp && cmp.available ? cmp.match : null, "Rota do plano confere com o briefing");
+
+  let handlingOk = null;
+  if (plan) {
+    const o = plan.handling_origem_confirmado;
+    const d = plan.handling_destino_confirmado;
+    handlingOk = o === true && d === true ? true : o === false || d === false ? false : null;
+  }
+  addChecklistItem(container, handlingOk, "Atendimento (handling) confirmado na origem e destino");
+
+  addChecklistItem(container, plan ? plan.fpl_aprovado && plan.fpl_ok : null, "FPL aprovado e OK");
+
+  let docsOk = null;
+  if (docs && docs.comparison && docs.comparison.length) {
+    docsOk = !docs.comparison.some((g) => g.has_issue);
+  }
+  addChecklistItem(container, docsOk, "Documentos de tripulação/passageiros sem divergência");
+}
+
+const CHECKLIST_MANUAL_ITEMS = [
+  { id: "doc-aeronave", label: "Documentação da aeronave conferida (matrícula, aeronavegabilidade, seguro)" },
+  { id: "peso-balanceamento", label: "Peso e balanceamento calculado" },
+  { id: "combustivel", label: "Combustível calculado e conferido" },
+  { id: "briefing-tripulacao", label: "Briefing de tripulação realizado" },
+  { id: "bagagem-carga", label: "Bagagem/carga conferida" },
+  { id: "equip-emergencia", label: "Equipamentos de emergência verificados" },
+];
+
+const CHECKLIST_MANUAL_KEY = "flightops_checklist_manual";
+
+function loadChecklistManualState() {
+  try {
+    return JSON.parse(localStorage.getItem(CHECKLIST_MANUAL_KEY) || "{}");
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveChecklistManualState(state) {
+  try {
+    localStorage.setItem(CHECKLIST_MANUAL_KEY, JSON.stringify(state));
+  } catch (err) {
+    // localStorage indisponível (ex: modo privado) — segue sem persistir.
+  }
+}
+
+function renderChecklistGeralManual() {
+  const container = document.getElementById("checklist-geral-manual");
+  if (!container) return;
+  container.innerHTML = "";
+  const state = loadChecklistManualState();
+
+  for (const item of CHECKLIST_MANUAL_ITEMS) {
+    const row = document.createElement("label");
+    row.className = "checklist-item checklist-item-manual";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = !!state[item.id];
+    checkbox.addEventListener("change", () => {
+      const current = loadChecklistManualState();
+      current[item.id] = checkbox.checked;
+      saveChecklistManualState(current);
+    });
+
+    const labelEl = document.createElement("span");
+    labelEl.textContent = item.label;
+
+    row.appendChild(checkbox);
+    row.appendChild(labelEl);
+    container.appendChild(row);
+  }
+}
+
 function updateDashDispatch(data) {
   const total = data.comparison ? data.comparison.length : 0;
   const withIssue = data.comparison ? data.comparison.filter((g) => g.has_issue).length : 0;
@@ -1319,3 +1425,5 @@ $eventsMesSelect.addEventListener("change", () => {
   if (lastEventsData) renderCalendar(lastEventsData.calendar, $eventsMesSelect.value);
 });
 carregarSugestoes();
+renderChecklistGeralAuto();
+renderChecklistGeralManual();
