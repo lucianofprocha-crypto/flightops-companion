@@ -156,6 +156,16 @@
       </div>
     </section>
 
+    <section id="export-card" class="card form-card hidden">
+      <h2>Exportar Airport Intelligence</h2>
+      <p class="muted">Baixa a climatologia e os eventos abaixo dos mínimos deste ICAO/período em Excel ou PDF.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="btn-exportar-xlsx" class="btn-primary" style="flex:1; min-width:140px;">BAIXAR EXCEL</button>
+        <button id="btn-exportar-pdf" class="btn-primary" style="flex:1; min-width:140px;">BAIXAR PDF</button>
+      </div>
+      <p id="export-status" class="status"></p>
+    </section>
+
     <section class="card form-card">
       <h2>Leitura de flight briefing (PDF)</h2>
       <p class="muted">Envie o PDF de despacho (ex: ForeFlight) para extrair automaticamente METAR/TAF/SIGMET e os principais pontos de atenção dos NOTAMs.</p>

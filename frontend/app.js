@@ -51,8 +51,14 @@ const $eventsDetalheCard = document.getElementById("events-detalhe-card");
 const $eventsDetalheResumo = document.getElementById("events-detalhe-resumo");
 const $eventsDetalheMetars = document.getElementById("events-detalhe-metars");
 
+const $exportCard = document.getElementById("export-card");
+const $btnExportarXlsx = document.getElementById("btn-exportar-xlsx");
+const $btnExportarPdf = document.getElementById("btn-exportar-pdf");
+const $exportStatus = document.getElementById("export-status");
+
 let chartCategorias, chartMes, chartHora, chartEventoDetalhe;
 let lastEventsData = null;
+let lastAnalise = null; // { icao, periodo } — pra alimentar a exportação Excel/PDF
 
 // Últimos resultados de cada análise, guardados em memória pra alimentar o
 // relatório em PDF sem precisar reler os PDFs originais.
@@ -117,6 +123,7 @@ async function analisar() {
   $semDados.classList.add("hidden");
   $atisCard.classList.add("hidden");
   $eventsResultados.classList.add("hidden");
+  $exportCard.classList.add("hidden");
   setStatus(`Buscando histórico METAR de ${icao} (${periodoLabel(periodo)})...`);
 
   // ATIS e eventos abaixo dos mínimos são complementos — buscamos em
@@ -142,6 +149,8 @@ async function analisar() {
 
     const data = await resp.json();
     renderResultados(data);
+    lastAnalise = { icao, periodo };
+    $exportCard.classList.remove("hidden");
     setStatus("");
   } catch (err) {
     setStatus(`Erro: ${err.message}`, true);
@@ -1179,6 +1188,49 @@ async function gerarRelatorio() {
   }
 }
 
+function setExportStatus(msg, isError = false) {
+  $exportStatus.textContent = msg;
+  $exportStatus.classList.toggle("error", isError);
+}
+
+async function exportarClimatologia(formato) {
+  if (!lastAnalise) {
+    setExportStatus("Rode uma análise primeiro.", true);
+    return;
+  }
+
+  const { icao, periodo } = lastAnalise;
+  const botao = formato === "xlsx" ? $btnExportarXlsx : $btnExportarPdf;
+  botao.disabled = true;
+  setExportStatus(`Gerando ${formato.toUpperCase()}...`);
+
+  try {
+    const resp = await fetch(
+      `${API_BASE}/api/climatology/export?icao=${encodeURIComponent(icao)}&period=${encodeURIComponent(periodo)}&format=${formato}`
+    );
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `Erro ${resp.status}`);
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `airport-intelligence-${icao}.${formato}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setExportStatus("");
+  } catch (err) {
+    setExportStatus(`Erro: ${err.message}`, true);
+  } finally {
+    botao.disabled = false;
+  }
+}
+
 $icao.addEventListener("input", () => {
   $icao.value = $icao.value.toUpperCase();
 });
@@ -1187,6 +1239,8 @@ $btn.addEventListener("click", analisar);
 $btnBriefing.addEventListener("click", analisarBriefing);
 $btnDocs.addEventListener("click", compararDocumentos);
 $btnRelatorio.addEventListener("click", gerarRelatorio);
+$btnExportarXlsx.addEventListener("click", () => exportarClimatologia("xlsx"));
+$btnExportarPdf.addEventListener("click", () => exportarClimatologia("pdf"));
 $eventsMesSelect.addEventListener("change", () => {
   if (lastEventsData) renderCalendar(lastEventsData.calendar, $eventsMesSelect.value);
 });

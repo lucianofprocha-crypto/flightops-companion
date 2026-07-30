@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from .atis_client import fetch_atis
 from .briefing_parser import build_summary
 from .climatology import compute_climatology
+from .climatology_export import build_climatology_excel, build_climatology_pdf
 from .metar_client import (
     PERIOD_TO_DAYS,
     MetarFetchError,
@@ -160,6 +161,53 @@ def get_events(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return result
+
+
+@app.get("/api/climatology/export")
+def export_climatology(
+    icao: str = Query(..., min_length=4, max_length=4),
+    period: str = Query("365d"),
+    format: str = Query("pdf", pattern="^(pdf|xlsx)$"),
+    include_events: bool = Query(True),
+) -> Response:
+    """Baixa os dados de Airport Intelligence (climatologia +, por padrão,
+    eventos abaixo dos mínimos) em Excel (.xlsx) ou PDF — format=pdf ou
+    format=xlsx. Reaproveita o mesmo histórico já buscado por
+    /api/climatology e /api/events (cache compartilhado)."""
+    icao = icao.upper()
+    period = period.lower()
+
+    if period not in PERIOD_TO_DAYS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"período inválido. Use um de: {list(PERIOD_TO_DAYS.keys())}",
+        )
+
+    try:
+        observations = _get_observations(icao, period)
+        climatology = compute_climatology(icao, period, observations)
+        events = build_events_summary(icao, period, observations) if include_events else None
+    except NoHistoricalDataError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except MetarFetchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if format == "xlsx":
+        content = build_climatology_excel(climatology, events)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"airport-intelligence-{icao}.xlsx"
+    else:
+        content = build_climatology_pdf(climatology, events)
+        media_type = "application/pdf"
+        filename = f"airport-intelligence-{icao}.pdf"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.post("/api/briefing/upload")

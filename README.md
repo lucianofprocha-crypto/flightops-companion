@@ -58,6 +58,15 @@ colocar algo funcional de pé, decidi:
   que METAR não reporta assim). Servido por `GET /api/events`,
   aparece automaticamente junto do resultado do "ANALISAR" na tela
   inicial.
+- **Exportar Airport Intelligence (Excel/PDF):** botões "BAIXAR EXCEL"
+  e "BAIXAR PDF" logo abaixo dos eventos, reaproveitando a mesma
+  climatologia + eventos já buscados (sem nova consulta ao IEM
+  Mesonet). Implementado em `backend/app/climatology_export.py`
+  (openpyxl pro Excel, reportlab pro PDF), servido por
+  `GET /api/climatology/export`. O Excel sai em 6 abas (Resumo, Por
+  mês, Por hora, Heatmap, Calendário, Eventos); o PDF é um resumo
+  equivalente em texto/tabelas, com as mesmas cores de categoria
+  (VFR/MVFR/IFR/LIFR) usadas na tela.
 - **NOTAM (fonte oficial):** ainda não integrado. A fonte planejada é a API
   AISWEB do DECEA (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo
   brasileiro) — chave de API já solicitada, pendente de aprovação. Quando
@@ -114,6 +123,7 @@ backend/
     metar_client.py  # busca histórico no IEM Mesonet
     climatology.py   # cálculo das estatísticas
     minima_events.py # eventos abaixo dos mínimos (heatmap/calendário/lista)
+    climatology_export.py # exporta Airport Intelligence em Excel/PDF
     atis_client.py   # ATIS ao vivo (atis.info, cobertura EUA)
     briefing_parser.py    # leitura/resumo de PDF de flight briefing
     travel_docs_parser.py # comparação de GEDEC/eAPIS/eGAR

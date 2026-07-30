@@ -67,10 +67,14 @@ crescendo sem precisar reescrever o sistema:
   reporta de hora em hora + specials), não minuto a minuto — não temos
   granularidade menor que isso na fonte de dados
 - ✅ Dashboard — *versão simplificada (gráficos de categoria/mês/hora)*
-- ⬜ Exportar Excel — não implementado
-- ⬜ Exportar PDF do Airport Intelligence — não implementado *(existe
-  hoje um PDF de relatório de pré-voo, mas cobre briefing + documentos
-  de tripulação, não a climatologia do aeroporto)*
+- ✅ **Exportar Excel** — **implementado em 30/07/2026** em
+  `backend/app/climatology_export.py` (`GET /api/climatology/export?format=xlsx`).
+  6 abas: Resumo, Por mês, Por hora, Heatmap, Calendário, Eventos.
+- ✅ **Exportar PDF do Airport Intelligence** — **implementado em
+  30/07/2026**, mesmo módulo (`format=pdf`) — resumo de climatologia +
+  eventos abaixo dos mínimos em texto/tabelas coloridas. Distinto do
+  relatório de pré-voo (`report_generator.py`), que cobre
+  briefing/documentos, não climatologia.
 
 ### V2.0 — Mais aeroportos
 
@@ -124,6 +128,7 @@ priorizando o que o usuário mais precisava no dia a dia:
   mês/hora) + ATIS ao vivo (cobertura EUA)
 - Eventos abaixo dos mínimos: heatmap, calendário, lista de eventos e
   drill-down com METAR/SPECI + gráfico de visibilidade/teto
+- Exportar Airport Intelligence (climatologia + eventos) em Excel e PDF
 - Leitura de flight briefing em PDF: METAR/TAF/SIGMET, NOTAM
   (fechamentos de pista/táxi/aeródromo), comparação de rota
   (briefing × plano apresentado) + checklist de coordenação
