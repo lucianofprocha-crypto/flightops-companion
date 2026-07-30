@@ -58,6 +58,7 @@ const $exportStatus = document.getElementById("export-status");
 
 let chartCategorias, chartMes, chartHora, chartEventoDetalhe;
 let lastEventsData = null;
+let lastClimatologyData = null; // último payload de /api/climatology — alimenta o card do dashboard
 let lastAnalise = null; // { icao, periodo } — pra alimentar a exportação Excel/PDF
 
 // Últimos resultados de cada análise, guardados em memória pra alimentar o
@@ -149,6 +150,8 @@ async function analisar() {
 
     const data = await resp.json();
     renderResultados(data);
+    lastClimatologyData = data;
+    updateDashAirport();
     lastAnalise = { icao, periodo };
     $exportCard.classList.remove("hidden");
     setStatus("");
@@ -378,6 +381,7 @@ function renderEvents(data) {
 
   $eventsDetalheCard.classList.add("hidden");
   $eventsResultados.classList.remove("hidden");
+  updateDashEvents();
 }
 
 function renderHeatmap(heatmap) {
@@ -686,6 +690,7 @@ function renderBriefing(data) {
   renderRoute(data.route);
   renderChecklist(data.route);
   $briefingResultados.classList.remove("hidden");
+  updateDashBriefing(data);
 }
 
 function renderBriefingWeather(weather) {
@@ -1140,6 +1145,7 @@ function renderDocsComparison(data) {
   }
 
   $docsResultados.classList.remove("hidden");
+  updateDashDispatch(data);
 }
 
 function setRelatorioStatus(msg, isError = false) {
@@ -1229,6 +1235,74 @@ async function exportarClimatologia(formato) {
   } finally {
     botao.disabled = false;
   }
+}
+
+// Navegação da sidebar — troca qual view-panel fica visível. Não recarrega
+// dados: cada seção mantém o que já foi analisado ao trocar de aba.
+const $navItems = document.querySelectorAll(".nav-item[data-view]");
+const $viewPanels = document.querySelectorAll(".view-panel");
+
+function switchView(view) {
+  $navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.view === view));
+  $viewPanels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.viewPanel !== view));
+  window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+$navItems.forEach((btn) => btn.addEventListener("click", () => switchView(btn.dataset.view)));
+document.querySelectorAll("[data-goto]").forEach((el) => {
+  el.addEventListener("click", () => switchView(el.dataset.goto));
+});
+
+// Cards do Dashboard — resumo do que já foi analisado nesta sessão, a
+// partir dos mesmos dados que cada seção já busca (nenhuma chamada nova).
+function updateDashAirport() {
+  if (!lastClimatologyData) return;
+  const data = lastClimatologyData;
+  document.getElementById("dash-val-airport").textContent =
+    `${data.icao} — ${data.adverse_conditions_pct}% condições adversas`;
+  document.getElementById("dash-sub-airport").textContent = `Histórico: ${periodoLabel(data.period)}`;
+  const dot = document.getElementById("dash-dot-airport");
+  const pct = data.adverse_conditions_pct;
+  dot.className = "dash-status-dot " + (pct >= 30 ? "red" : pct >= 10 ? "amber" : "green");
+}
+
+function updateDashEvents() {
+  if (!lastEventsData) return;
+  const h = lastEventsData.headline;
+  document.getElementById("dash-val-events").textContent = `${h.availability_pct}% disponibilidade`;
+  document.getElementById("dash-sub-events").textContent =
+    `${h.event_count} evento(s) · ${h.hours_below_minima} h abaixo dos mínimos`;
+  const dot = document.getElementById("dash-dot-events");
+  dot.className = "dash-status-dot " + (h.availability_pct < 90 ? "red" : h.availability_pct < 97 ? "amber" : "green");
+}
+
+function updateDashBriefing(data) {
+  const notamCount = data.notams ? data.notams.active_now || 0 : 0;
+  const cmp = data.route && data.route.comparison;
+  let rotaTxt = "Briefing lido";
+  let dotCls = notamCount > 0 ? "amber" : "green";
+  if (cmp && cmp.available) {
+    rotaTxt = cmp.match ? "Rota confere com o plano" : "Divergência de rota";
+    dotCls = cmp.match ? (notamCount > 0 ? "amber" : "green") : "red";
+  }
+  document.getElementById("dash-val-briefing").textContent = rotaTxt;
+  document.getElementById("dash-sub-briefing").textContent = `${notamCount} NOTAM(s) vigente(s) de fechamento`;
+  document.getElementById("dash-dot-briefing").className = "dash-status-dot " + dotCls;
+}
+
+function updateDashDispatch(data) {
+  const total = data.comparison ? data.comparison.length : 0;
+  const withIssue = data.comparison ? data.comparison.filter((g) => g.has_issue).length : 0;
+  document.getElementById("dash-val-dispatch").textContent = total
+    ? `${total} pessoa(s) comparada(s)`
+    : "Nenhuma pessoa reconhecida";
+  document.getElementById("dash-sub-dispatch").textContent = withIssue
+    ? `${withIssue} com divergência`
+    : total
+    ? "Sem divergências"
+    : "";
+  document.getElementById("dash-dot-dispatch").className =
+    "dash-status-dot " + (withIssue ? "red" : total ? "green" : "grey");
 }
 
 $icao.addEventListener("input", () => {

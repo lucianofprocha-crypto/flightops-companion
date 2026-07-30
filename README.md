@@ -69,10 +69,17 @@ colocar algo funcional de pé, decidi:
   (VFR/MVFR/IFR/LIFR) usadas na tela.
 - **Visual (paleta e tipografia):** o frontend usa a paleta e a fonte
   (Inter) do design system de referência em `docs/design-system-reference.png`
-  — primary/secondary navy, accent teal, warning/danger/success. Só o
-  visual mudou; a estrutura da página (sem sidebar, sem dashboard
-  consolidado) continua a mesma — isso fica pro roadmap gradual se
-  fizer sentido depois.
+  — primary/secondary navy, accent teal, warning/danger/success.
+- **Layout (sidebar + dashboard):** navegação lateral (vira barra de abas
+  horizontal no celular) com 4 seções — Dashboard, Airport Intelligence,
+  Flight Briefing e Dispatch. O Dashboard mostra cards de status
+  (climatologia, eventos abaixo dos mínimos, briefing/rota, documentos)
+  alimentados pelos dados que cada seção já busca, sem nenhuma chamada
+  nova. Risk score, combustível, tripulação/SOB e mini-mapa de rota do
+  mockup original **não** foram implementados de propósito — o app não
+  calcula esses dados hoje e preferimos não simular números numa
+  ferramenta de decisão operacional; ficam como candidatos a entrar
+  quando houver uma fonte de dados real.
 - **NOTAM (fonte oficial):** ainda não integrado. A fonte planejada é a API
   AISWEB do DECEA (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo
   brasileiro) — chave de API já solicitada, pendente de aprovação. Quando

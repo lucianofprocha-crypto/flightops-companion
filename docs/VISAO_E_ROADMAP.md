@@ -111,16 +111,20 @@ Ver `docs/design-system-reference.png`.
 
 **✅ Paleta e tipografia — implementado em 30/07/2026.** `frontend/styles.css`
 e `frontend/app.js` (cores de gráficos/badges) agora usam as cores e a
-fonte Inter acima. Só a parte visual (cores/tipografia) — a estrutura da
-página continua a mesma (sem sidebar, sem risk score, sem mini-mapa).
+fonte Inter acima.
 
-Esse dashboard consolidado (com risk score, mini-mapa e status chips)
-é essencialmente a visão de longo prazo do app — hoje o FlightOps
-Companion já cobre boa parte dos dados que alimentariam esses cards
-(clima, NOTAM, rota, checklist, documentos), mas ainda como seções
-separadas por fluxo (climatologia / briefing / documentos), não como
-um dashboard único. Migrar pra esse layout é candidato a entrar no
-roadmap gradual mencionado acima.
+**✅ Sidebar + Dashboard consolidado — implementado em 30/07/2026.** Layout
+migrou para sidebar de navegação (4 seções: Dashboard, Airport
+Intelligence, Flight Briefing, Dispatch) + uma view de Dashboard com
+cards de status alimentados pelos dados que cada seção já busca — sem
+nenhuma chamada nova ao backend. Diferenças em relação ao mockup
+original: **sem** operational risk score (gauge 0–100), **sem** mini-mapa
+de rota, **sem** status chips de Fuel/Handling/Alternate — o app não
+calcula esses dados hoje (não lê combustível, tripulação/SOB nem
+desenha mapa) e decidimos não simular números numa ferramenta de
+decisão operacional. Ficam como candidatos a um próximo passo, se/quando
+houver uma fonte de dados real pra eles (ver "Relatório em PDF — Fase 2"
+no README, que depende da mesma leitura de capa do briefing).
 
 ## O que já foi implementado (fora da ordem do roadmap original)
 

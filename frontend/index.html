@@ -11,12 +11,96 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
 </head>
 <body>
-  <header class="app-header">
-    <h1>FlightOps Companion</h1>
-    <p class="subtitle">Airport Intelligence &mdash; climatologia baseada em METAR histórico</p>
-  </header>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark">FC</span>
+        <span class="brand-text">FlightOps<br /><small>Companion</small></span>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="dashboard" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-item" data-view="airport" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4-1.5A4 4 0 0 0 6 19h11.5Z"/></svg>
+          <span>Airport Intelligence</span>
+        </button>
+        <button class="nav-item" data-view="briefing" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M6 3h8l5 5v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M9 13h6M9 17h6"/></svg>
+          <span>Flight Briefing</span>
+        </button>
+        <button class="nav-item" data-view="dispatch" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+          <span>Dispatch</span>
+        </button>
+      </nav>
+    </aside>
 
-  <main class="container">
+    <div class="main-area">
+      <main class="container">
+        <section data-view-panel="dashboard" class="view-panel">
+          <div class="card dash-welcome">
+            <h2 style="margin:0 0 4px;">Dashboard</h2>
+            <p class="muted" style="margin:0;">Resumo do que já foi verificado nesta sessão. Use o menu ao lado para rodar uma análise.</p>
+          </div>
+
+          <div class="dash-grid">
+            <button class="dash-card" data-goto="airport" type="button">
+              <div class="dash-card-head">
+                <svg class="dash-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4-1.5A4 4 0 0 0 6 19h11.5Z"/></svg>
+                <span class="dash-status-dot grey" id="dash-dot-airport"></span>
+              </div>
+              <div class="dash-card-label">AIRPORT INTELLIGENCE</div>
+              <div class="dash-card-value" id="dash-val-airport">Nenhuma análise ainda</div>
+              <div class="dash-card-sub" id="dash-sub-airport"></div>
+            </button>
+
+            <button class="dash-card" data-goto="airport" type="button">
+              <div class="dash-card-head">
+                <svg class="dash-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                <span class="dash-status-dot grey" id="dash-dot-events"></span>
+              </div>
+              <div class="dash-card-label">EVENTOS ABAIXO DOS MÍNIMOS</div>
+              <div class="dash-card-value" id="dash-val-events">—</div>
+              <div class="dash-card-sub" id="dash-sub-events"></div>
+            </button>
+
+            <button class="dash-card" data-goto="briefing" type="button">
+              <div class="dash-card-head">
+                <svg class="dash-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M6 3h8l5 5v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M9 13h6M9 17h6"/></svg>
+                <span class="dash-status-dot grey" id="dash-dot-briefing"></span>
+              </div>
+              <div class="dash-card-label">FLIGHT BRIEFING</div>
+              <div class="dash-card-value" id="dash-val-briefing">Nenhum briefing lido</div>
+              <div class="dash-card-sub" id="dash-sub-briefing"></div>
+            </button>
+
+            <button class="dash-card" data-goto="dispatch" type="button">
+              <div class="dash-card-head">
+                <svg class="dash-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+                <span class="dash-status-dot grey" id="dash-dot-dispatch"></span>
+              </div>
+              <div class="dash-card-label">DOCUMENTOS (DISPATCH)</div>
+              <div class="dash-card-value" id="dash-val-dispatch">Nenhuma comparação ainda</div>
+              <div class="dash-card-sub" id="dash-sub-dispatch"></div>
+            </button>
+          </div>
+
+          <div class="card">
+            <h2 style="margin:0 0 4px; font-size:16px;">Relatório de pré-voo (PDF)</h2>
+            <p class="muted">Gera um PDF resumindo o que já foi analisado: meteorologia, NOTAMs, rota + checklist de coordenação e a comparação de documentos de tripulação/passageiros.</p>
+            <button id="gerar-relatorio" class="btn-primary">GERAR RELATÓRIO PDF</button>
+            <p id="relatorio-status" class="status"></p>
+          </div>
+
+          <div class="card">
+            <h3>Ainda não calculado pelo app</h3>
+            <p class="muted" style="margin:0;">Risk score operacional, combustível, tripulação/SOB e mini-mapa de rota fazem parte da visão original do produto (ver <code>docs/VISAO_E_ROADMAP.md</code>), mas dependem de dados que o FlightOps Companion ainda não lê automaticamente. Preferimos não simular esses números aqui — é uma ferramenta de decisão operacional.</p>
+          </div>
+        </section>
+
+        <section data-view-panel="airport" class="view-panel hidden">
     <section class="card form-card">
       <div class="field">
         <label for="icao">ICAO (qualquer aeroporto do mundo)</label>
@@ -168,7 +252,9 @@
       </div>
       <p id="export-status" class="status"></p>
     </section>
+        </section>
 
+        <section data-view-panel="briefing" class="view-panel hidden">
     <section class="card form-card">
       <h2>Leitura de flight briefing (PDF)</h2>
       <p class="muted">Envie o PDF de despacho (ex: ForeFlight) para extrair automaticamente METAR/TAF/SIGMET e os principais pontos de atenção dos NOTAMs.</p>
@@ -211,7 +297,9 @@
         <div id="checklist-content" style="overflow: hidden; max-width: 100%;"></div>
       </div>
     </section>
+        </section>
 
+        <section data-view-panel="dispatch" class="view-panel hidden">
     <section class="card form-card">
       <h2>Comparar documentos de tripulação/passageiros</h2>
       <p class="muted">Envie GEDEC, eAPIS e/ou eGAR (pelo menos um) para cruzar nome, nacionalidade, número de documento e data de nascimento entre eles antes do voo.</p>
@@ -241,14 +329,10 @@
       </div>
       <div id="docs-comparacao" style="display:flex; flex-direction:column; gap:12px;"></div>
     </section>
-
-    <section class="card form-card">
-      <h2>Relatório de pré-voo (PDF)</h2>
-      <p class="muted">Gera um PDF resumindo o que já foi analisado nesta página: meteorologia, NOTAMs, rota + checklist de coordenação e a comparação de documentos de tripulação/passageiros.</p>
-      <button id="gerar-relatorio" class="btn-primary">GERAR RELATÓRIO PDF</button>
-      <p id="relatorio-status" class="status"></p>
-    </section>
-  </main>
+        </section>
+      </main>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
