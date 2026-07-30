@@ -676,6 +676,21 @@ def parse_plan_text(text: str) -> dict:
     result["route_tokens"] = fpl["route_tokens"]
     result["fpl"] = fpl
 
+    # Fallback: quando só o STRIP ICAO é colado (sem a linha-resumo do
+    # despachante com "DOF:" e horários HH:MMZ), o header regex acima não
+    # casa e departure_icao/arrival_icao ficam None. O próprio STRIP já traz
+    # essa informação nos campos 13 (aeródromo de partida + hora) e 16
+    # (aeródromo de destino + EET total + alternado) — usamos como fallback.
+    # Atenção: fpl["total_eet"] é a duração total do voo (ex: "1119" =
+    # 11h19min), não um horário UTC de chegada — por isso não é usado aqui
+    # como arrival_time.
+    if not result["departure_icao"] and fpl["departure_icao"]:
+        result["departure_icao"] = fpl["departure_icao"]
+        if not result["departure_time"] and fpl["departure_time"]:
+            result["departure_time"] = fpl["departure_time"]
+    if not result["arrival_icao"] and fpl["destination_icao"]:
+        result["arrival_icao"] = fpl["destination_icao"]
+
     return result
 
 
