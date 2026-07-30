@@ -7,9 +7,11 @@ comparacao de rota (briefing x plano apresentado) + checklist de
 coordenacao, e a comparacao de documentos de tripulacao/passageiros
 (GEDEC/eAPIS/eGAR/lista de passageiros).
 
-Fase 1 e so texto/tabelas: sem mapa da rota e sem combustivel/tripulacao/
-alternados (esses dados vem da capa do PDF de briefing, que ainda nao e
-lida pelo app). Isso fica pra uma fase futura.
+Fase 1 e so texto/tabelas. "Fase 2" adicionou o resumo da capa do briefing
+(combustivel, tripulacao/SOB, ETD/ETA/ETE) quando o layout ForeFlight e
+reconhecido - ainda sem mapa de rota (exigiria uma base de waypoints que o
+app nao tem) nem alternados de RVSM/FIR (dado presente na capa mas de
+interpretacao incerta o suficiente pra nao arriscar exibir errado).
 
 O payload de entrada e simplesmente o JSON que /api/briefing/upload e/ou
 /api/traveldocs/compare ja devolveram - o frontend reenvia aqui o que
@@ -257,6 +259,101 @@ def _checklist_section(styles, route: dict | None) -> list:
     return flow
 
 
+_COVER_FUEL_LABELS = {
+    "taxi": "Taxi",
+    "destination": "Destino",
+    "contingency": "Contingencia",
+    "alternate_fuel": "Combustivel alternado",
+    "final_reserve": "Reserva final",
+    "additional": "Adicional",
+    "min_required": "Minimo requerido",
+    "extra": "Extra",
+    "discretionary": "Discricionario",
+    "total": "Total",
+    "landing": "Pouso",
+}
+_COVER_FUEL_ORDER = list(_COVER_FUEL_LABELS.keys())
+
+
+def _cover_section(styles, cover: dict | None) -> list:
+    flow = [Paragraph("Resumo do voo, combustivel e tripulacao", styles["H2FO"])]
+    if not cover:
+        flow.append(
+            Paragraph(
+                "Capa do briefing nao lida (layout nao reconhecido ou pagina ausente).",
+                styles["Body9"],
+            )
+        )
+        return flow
+
+    dep = _esc(cover.get("departure_icao") or "?")
+    dest = _esc(cover.get("destination_icao") or "?")
+    header = (
+        f"<b>{dep} -&gt; {dest}</b> &middot; {_esc(cover.get('callsign'))} &middot; "
+        f"{_esc(cover.get('aircraft'))} &middot; {_esc(cover.get('flight_rules'))}"
+    )
+    flow.append(Paragraph(header, styles["Body9"]))
+
+    sob = cover.get("souls_on_board")
+    linha2 = (
+        f"ETD {_esc(cover.get('etd_utc')) or '-'} &middot; ETA {_esc(cover.get('eta_utc')) or '-'} "
+        f"&middot; ETE {_esc(cover.get('ete')) or '-'} &middot; {_esc(cover.get('distance')) or '-'} "
+        f"&middot; {_esc(cover.get('cruise_altitude')) or '-'} "
+        f"&middot; SOB {sob if sob is not None else '-'}"
+    )
+    flow.append(Paragraph(linha2, styles["Body9"]))
+    flow.append(Spacer(1, 5))
+
+    fuel = cover.get("fuel") or {}
+    if fuel:
+        data = [["Item", "Lbs", "Tempo"]]
+        total_row_idx = None
+        for key in _COVER_FUEL_ORDER:
+            entry = fuel.get(key)
+            if not entry:
+                continue
+            label = _COVER_FUEL_LABELS[key]
+            if entry.get("pct") is not None:
+                label += f" ({entry['pct']}%)"
+            lbs = f"{entry['lbs']:,}".replace(",", ".") if entry.get("lbs") is not None else "-"
+            data.append([_esc(label), lbs, entry.get("time") or "-"])
+            if key == "total":
+                total_row_idx = len(data) - 1
+
+        table = Table(data, colWidths=[80 * mm, 30 * mm, 30 * mm], repeatRows=1)
+        style_cmds = [
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("BACKGROUND", (0, 0), (-1, 0), _INK),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.5, _LINE),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]
+        if total_row_idx is not None:
+            style_cmds.append(("FONTNAME", (0, total_row_idx), (-1, total_row_idx), "Helvetica-Bold"))
+        table.setStyle(TableStyle(style_cmds))
+        flow.append(table)
+        flow.append(Spacer(1, 6))
+
+    crew = cover.get("crew") or []
+    if crew:
+        flow.append(Paragraph("<b>Tripulacao</b>", styles["Body9"]))
+        for person in crew:
+            flow.append(Paragraph(f"{_esc(person.get('role'))}: {_esc(person.get('name'))}", styles["Body9"]))
+        flow.append(Spacer(1, 4))
+
+    rodape = []
+    if cover.get("planner"):
+        rodape.append(f"Planner: {_esc(cover['planner'])}")
+    if cover.get("recall_number"):
+        rodape.append(f"Recall #{_esc(cover['recall_number'])}")
+    if rodape:
+        flow.append(Paragraph(" &middot; ".join(rodape), styles["Small"]))
+
+    return flow
+
+
 # ---------------------------------------------------------------------------
 # Secao de documentos de tripulacao/passageiros
 # ---------------------------------------------------------------------------
@@ -379,6 +476,7 @@ def build_report(payload: dict) -> bytes:
     flow.append(HRFlowable(width="100%", thickness=0.75, color=_INK, spaceBefore=6, spaceAfter=8))
 
     if briefing:
+        flow += _cover_section(styles, briefing.get("cover"))
         flow += _weather_section(styles, briefing.get("weather"))
         flow += _notam_section(styles, briefing.get("notams"))
         route = briefing.get("route")

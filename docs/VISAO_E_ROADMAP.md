@@ -43,8 +43,9 @@ crescendo sem precisar reescrever o sistema:
   `briefing_parser.py`, incluindo comparação de rota e checklist de
   coordenação)*
 - **Performance Engine** (futuro) — combustível, ETPs, alternados.
-  *(não iniciado — depende de ler a capa do briefing, ver Fase 2 do
-  relatório em PDF no README principal)*
+  *(combustível/SOB/tripulação **implementado em 30/07/2026** via leitura
+  da capa do briefing, ver README principal; ETPs/mapa de rota ainda não
+  — dependem de base de waypoints que o app não tem)*
 
 ## Roadmap original (V1 → V3)
 
@@ -141,5 +142,7 @@ priorizando o que o usuário mais precisava no dia a dia:
   (briefing × plano apresentado) + checklist de coordenação
 - Comparação de documentos de tripulação/passageiros (GEDEC, eAPIS,
   eGAR via OCR, lista de passageiros)
-- Relatório de pré-voo em PDF (Fase 1: texto/tabelas, sem mapa/combustível)
+- Relatório de pré-voo em PDF (Fase 1: texto/tabelas) + Fase 2 (capa do
+  briefing: combustível, tripulação/SOB, ETD/ETA/ETE — sem mapa de rota)
+- Checklist geral de pré-voo (automático + manual, salvo no navegador)
 - Deploy em produção (Render, via Docker por causa do OCR)

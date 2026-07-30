@@ -684,7 +684,139 @@ async function analisarBriefing() {
   }
 }
 
+const COVER_FUEL_LABELS_PT = {
+  taxi: "Taxi",
+  destination: "Destino",
+  contingency: "Contingência",
+  alternate_fuel: "Combustível alternado",
+  final_reserve: "Reserva final",
+  additional: "Adicional",
+  min_required: "Mínimo requerido",
+  extra: "Extra",
+  discretionary: "Discricionário",
+  total: "Total",
+  landing: "Pouso",
+};
+const COVER_FUEL_ORDER = [
+  "taxi",
+  "destination",
+  "contingency",
+  "alternate_fuel",
+  "final_reserve",
+  "additional",
+  "min_required",
+  "extra",
+  "discretionary",
+  "total",
+  "landing",
+];
+
+function renderCover(cover) {
+  const card = document.getElementById("cover-card");
+  const content = document.getElementById("cover-content");
+  content.innerHTML = "";
+
+  if (!cover) {
+    card.classList.add("hidden");
+    return;
+  }
+  card.classList.remove("hidden");
+
+  const metricsGrid = document.createElement("div");
+  metricsGrid.className = "metrics-grid";
+  const metrics = [
+    ["Rota", `${cover.departure_icao || "?"} → ${cover.destination_icao || "?"}`],
+    ["ETD", cover.etd_utc ? `${cover.etd_utc}${cover.etd_local ? " (" + cover.etd_local + ")" : ""}` : "—"],
+    ["ETA", cover.eta_utc ? `${cover.eta_utc}${cover.eta_local ? " (" + cover.eta_local + ")" : ""}` : "—"],
+    ["ETE", cover.ete || "—"],
+    ["Distância", cover.distance || "—"],
+    ["Altitude de cruzeiro", cover.cruise_altitude || "—"],
+    ["Souls on board", cover.souls_on_board != null ? String(cover.souls_on_board) : "—"],
+  ];
+  for (const [label, value] of metrics) {
+    const m = document.createElement("div");
+    m.className = "metric";
+    const l = document.createElement("span");
+    l.className = "metric-label";
+    l.textContent = label;
+    const v = document.createElement("span");
+    v.className = "metric-value";
+    v.style.fontSize = "14px";
+    v.textContent = value;
+    m.appendChild(l);
+    m.appendChild(v);
+    metricsGrid.appendChild(m);
+  }
+  content.appendChild(metricsGrid);
+
+  if (cover.fuel && Object.keys(cover.fuel).length) {
+    const fuelLabel = document.createElement("div");
+    fuelLabel.className = "weather-field-label";
+    fuelLabel.style.marginTop = "12px";
+    fuelLabel.textContent = "Combustível (lbs)";
+    content.appendChild(fuelLabel);
+
+    const table = document.createElement("table");
+    table.className = "docs-table";
+    const thead = document.createElement("thead");
+    thead.innerHTML = "<tr><th>Item</th><th>Lbs</th><th>Tempo</th></tr>";
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    for (const key of COVER_FUEL_ORDER) {
+      const entry = cover.fuel[key];
+      if (!entry) continue;
+      const tr = document.createElement("tr");
+      const label = COVER_FUEL_LABELS_PT[key] + (entry.pct != null ? ` (${entry.pct}%)` : "");
+      if (key === "total") tr.style.fontWeight = "700";
+      const tdLabel = document.createElement("td");
+      tdLabel.textContent = label;
+      const tdLbs = document.createElement("td");
+      tdLbs.textContent = entry.lbs != null ? entry.lbs.toLocaleString("pt-BR") : "—";
+      const tdTime = document.createElement("td");
+      tdTime.textContent = entry.time || "—";
+      tr.appendChild(tdLabel);
+      tr.appendChild(tdLbs);
+      tr.appendChild(tdTime);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    content.appendChild(table);
+  }
+
+  if (cover.crew && cover.crew.length) {
+    const crewLabel = document.createElement("div");
+    crewLabel.className = "weather-field-label";
+    crewLabel.style.marginTop = "12px";
+    crewLabel.textContent = "Tripulação";
+    content.appendChild(crewLabel);
+
+    for (const person of cover.crew) {
+      const item = document.createElement("div");
+      item.style.fontSize = "13px";
+      item.style.padding = "3px 0";
+      const strong = document.createElement("strong");
+      strong.textContent = `${person.role}: `;
+      item.appendChild(strong);
+      item.appendChild(document.createTextNode(person.name || "—"));
+      content.appendChild(item);
+    }
+  }
+
+  const footerParts = [];
+  if (cover.planner) footerParts.push(`Planner: ${cover.planner}`);
+  if (cover.recall_number) footerParts.push(`Recall #${cover.recall_number}`);
+  if (cover.aircraft) footerParts.push(`Aeronave: ${cover.aircraft}`);
+  if (footerParts.length) {
+    const footer = document.createElement("p");
+    footer.className = "muted";
+    footer.style.margin = "10px 0 0";
+    footer.textContent = footerParts.join(" · ");
+    content.appendChild(footer);
+  }
+}
+
 function renderBriefing(data) {
+  renderCover(data.cover);
   renderBriefingWeather(data.weather);
   renderBriefingNotams(data.notams);
   renderRoute(data.route);

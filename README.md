@@ -132,9 +132,23 @@ colocar algo funcional de pé, decidi:
   coordenação e a comparação de documentos de tripulação/passageiros.
   Implementado em `backend/app/report_generator.py` (reportlab), servido
   por `POST /api/report/generate`. O frontend só reenvia o JSON que os
-  outros endpoints já devolveram — nenhum PDF é relido. **Fase 1** é só
-  texto/tabelas: não inclui o mapa da rota nem dados de combustível,
-  tripulação e alternados da capa do briefing (fica pra uma fase futura).
+  outros endpoints já devolveram — nenhum PDF é relido.
+- **Capa do briefing — combustível, tripulação e SOB (Fase 2):**
+  `backend/app/briefing_parser.py` (`parse_cover_page`) lê a página 1 do
+  briefing (layout ForeFlight) usando a posição das palavras na página
+  (não o texto corrido, que embaralha as duas colunas) e extrai
+  ETD/ETA/ETE/distância/altitude de cruzeiro, a tabela de combustível
+  completa (taxi, destino, contingência, alternado, reserva final,
+  adicional, mínimo requerido, extra, discricionário, total, pouso — em
+  lbs e tempo) e a tripulação (PIC/SIC/comissário, podendo haver mais de
+  um PIC) + souls on board + planner + recall #. Aparece como card na
+  seção Flight Briefing e como seção no relatório PDF. Se a primeira
+  página não tiver esse layout específico, a função retorna `None` em vez
+  de arriscar extrair dado errado — o card/seção simplesmente não aparece
+  nesse caso. **Não inclui** mapa de rota (exigiria uma base de waypoints
+  mundial que o app não tem) nem a lista "ALT/RVSM CHECKS" da capa (é uma
+  lista de FIRs cruzados, não de aeródromos alternados — o alternado real
+  já vem do campo 16 do plano de voo, em `route.briefing.alternate_icao`).
 
 ## Estrutura
 
@@ -215,11 +229,12 @@ de deploy é o mesmo (push pro GitHub, Render redeploya automaticamente).
   complementar (não substituir) a leitura de PDF acima, trazendo NOTAM
   atualizado na hora em vez de depender de um briefing já gerado.
 - Persistir os dados buscados (hoje o cache é só em memória e expira em 1h).
-- **Relatório em PDF — Fase 2**: replicar o "sketch" visual completo (mapa
-  de rota com FIRs coloridos, combustível, tripulação/SOB e alternados),
-  o que exige (a) ler a capa do briefing (esses dados ainda não são
-  extraídos por `briefing_parser.py`) e (b) uma forma de desenhar o mapa —
-  `cartopy`/`geopandas` não estão disponíveis no ambiente atual, então
-  provavelmente via dados de fronteiras leves + `matplotlib`.
+- **Relatório em PDF — Fase 2, parte 2 (mapa de rota):** combustível,
+  tripulação/SOB e ETD/ETA/ETE **já implementados** (ver seção de recursos
+  acima). Falta o mapa de rota com FIRs coloridos — a rota vem como
+  waypoints/aerovias (ex: "EPOLO8A EPOLO DCT SOFFY..."), não coordenadas,
+  então desenhar o mapa exige uma base de dados de navegação mundial
+  (waypoints/aerovias), que normalmente é dado licenciado (ciclo AIRAC) e
+  o app não tem hoje. Sem essa fonte, não dá pra fazer com confiança.
 - ~~**Checklist geral de pré-voo**~~ — **implementado em 30/07/2026**, ver
   seção de recursos acima.

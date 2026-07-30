@@ -473,6 +473,209 @@ def _dedupe_notams(records: list[NotamRecord]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# CAPA do briefing (página 1, layout ForeFlight) — resumo do voo, ETD/ETA,
+# combustível e tripulação/SOB. "Fase 2" do relatório de pré-voo.
+# ---------------------------------------------------------------------------
+
+_COVER_HEADER_RE = re.compile(
+    r"(?P<dep>[A-Z]{4})\s*[—\-]\s*(?P<dest>[A-Z]{4})\s*\((?P<date>[^)]+)\)\s*in\s*"
+    r"(?P<callsign>\S+)\s*\((?P<aircraft>.+)\)\s*(?P<rules>IFR|VFR)\s*Created\s*(?P<created>.+)"
+)
+
+_COVER_ETE_RE = re.compile(
+    r"(?P<ete>\d+h\d+m)\s+"
+    r"(?P<distance>\d+NM)\s+"
+    r"(?P<wind>\d+kt\s+\w+\s*\([^)]*\))\s+"
+    r"(?P<etd_local>[\d:]+)\s+(?P<etd_tz>\w+)\s*/\s*(?P<etd_utc>\d{4}Z)\s+"
+    r"(?P<eta_local>[\d:]+)\s*/\s*(?P<eta_utc>\d{4}Z)\s+"
+    r"(?P<tas>\d+kt)\s+"
+    r"(?P<altitude>FL\d+|\d+ft)"
+)
+
+# Ordem fixa dos rótulos de combustível no template ForeFlight — usada como
+# âncora sequencial (cada rótulo marca onde termina o valor do anterior).
+_COVER_FUEL_LABELS = [
+    ("taxi", r"Taxi"),
+    ("destination", r"Destination"),
+    ("contingency", r"Contingency,\s*(\d+)\s*"),
+    ("alternate_fuel", r"Alternate\s+Fuel"),
+    ("final_reserve", r"Final\s+Reserve"),
+    ("additional", r"Additional"),
+    ("min_required", r"Min\s+required"),
+    ("extra", r"Extra"),
+    ("discretionary", r"Discretionary"),
+    ("total", r"Total"),
+    ("landing", r"Landing"),
+]
+
+# Rótulos da coluna "INFO" (tripulação/SOB) — "PIC" pode aparecer mais de
+# uma vez (mais de um piloto qualificado como comandante).
+_COVER_LABEL_SEQS = [
+    (("Recall", "#"), "recall_number", False),
+    (("Cabin", "Attendant"), "Cabin Attendant", True),
+    (("Souls", "on", "board"), "souls_on_board", False),
+    (("Signature",), "signature", False),
+    (("Planner",), "planner", False),
+    (("PIC",), "PIC", True),
+    (("SIC",), "SIC", True),
+]
+
+
+def _parse_cover_fuel_block(text: str) -> dict:
+    positions = []
+    for key, pat in _COVER_FUEL_LABELS:
+        m = re.search(pat, text)
+        if m:
+            positions.append((m.start(), m.end(), key, m))
+    positions.sort()
+
+    fuel: dict = {}
+    for i, (start, end, key, m) in enumerate(positions):
+        next_start = positions[i + 1][0] if i + 1 < len(positions) else len(text)
+        segment = text[end:next_start]
+        lbs_m = re.search(r"(\d[\d,]*)", segment)
+        time_m = re.search(r"(\d+:\d+)", segment)
+        entry = {
+            "lbs": int(lbs_m.group(1).replace(",", "")) if lbs_m else None,
+            "time": time_m.group(1) if time_m else None,
+        }
+        if key == "contingency":
+            entry["pct"] = int(m.group(1))
+        fuel[key] = entry
+    return fuel
+
+
+def _match_cover_label(tokens: list[str], i: int):
+    for seq, key, is_crew in _COVER_LABEL_SEQS:
+        n = len(seq)
+        if tuple(tokens[i : i + n]) == seq:
+            return n, key, is_crew
+    return None
+
+
+def _parse_cover_crew_block(tokens: list[str]) -> tuple[list[dict], dict]:
+    i = 0
+    fields = []
+    current = None
+    while i < len(tokens):
+        matched = _match_cover_label(tokens, i)
+        if matched:
+            n, key, is_crew = matched
+            current = {"key": key, "is_crew": is_crew, "tokens": []}
+            fields.append(current)
+            i += n
+        else:
+            if current is not None:
+                current["tokens"].append(tokens[i])
+            i += 1
+
+    crew = []
+    info = {"recall_number": None, "souls_on_board": None, "planner": None, "signature": None}
+    for f in fields:
+        value = " ".join(f["tokens"]).strip()
+        if f["is_crew"]:
+            crew.append({"role": f["key"], "name": value or None})
+        elif f["key"] == "souls_on_board":
+            m = re.search(r"\d+", value)
+            info["souls_on_board"] = int(m.group(0)) if m else None
+        elif f["key"] in info:
+            info[f["key"]] = value or None
+    return crew, info
+
+
+def parse_cover_page(pdf) -> dict | None:
+    """Lê a capa do briefing (página 1, layout ForeFlight): resumo do voo,
+    ETD/ETA/ETE/distância, combustível (coluna esquerda) e tripulação/SOB
+    (coluna direita), usando a posição das palavras na página — o texto
+    corrido intercala as duas colunas e embaralha nomes que quebram linha.
+    Retorna None se a primeira página não tiver esse layout (ex: briefing
+    de outra fonte) — não arrisca inventar dado de combustível/tripulação."""
+    if not pdf.pages:
+        return None
+    page = pdf.pages[0]
+    words = page.extract_words()
+    full_text = page.extract_text() or ""
+    lines = full_text.splitlines()
+    if not lines:
+        return None
+
+    header_m = _COVER_HEADER_RE.match(lines[0])
+    if not header_m:
+        return None
+
+    g = header_m.groupdict()
+    result: dict = {
+        "source": "PDF (capa do briefing)",
+        "departure_icao": g["dep"],
+        "destination_icao": g["dest"],
+        "date": g["date"],
+        "callsign": g["callsign"],
+        "aircraft": g["aircraft"],
+        "flight_rules": g["rules"],
+        "created_at": g["created"],
+        "ete": None,
+        "distance": None,
+        "etd_local": None,
+        "etd_utc": None,
+        "eta_local": None,
+        "eta_utc": None,
+        "cruise_altitude": None,
+        "fuel": {},
+        "crew": [],
+        "souls_on_board": None,
+        "planner": None,
+        "recall_number": None,
+    }
+
+    for line in lines[1:6]:
+        m = _COVER_ETE_RE.match(line)
+        if m:
+            g2 = m.groupdict()
+            result["ete"] = g2["ete"]
+            result["distance"] = g2["distance"]
+            result["etd_local"] = f'{g2["etd_local"]} {g2["etd_tz"]}'
+            result["etd_utc"] = g2["etd_utc"]
+            result["eta_local"] = g2["eta_local"]
+            result["eta_utc"] = g2["eta_utc"]
+            result["cruise_altitude"] = g2["altitude"]
+            break
+
+    # Combustível: coluna esquerda (x0 < 380), delimitada dinamicamente
+    # entre os rótulos "Taxi" (primeiro) e "Landing" (último) — evita
+    # depender de coordenadas fixas de página.
+    taxi_words = [w for w in words if w["text"] == "Taxi" and w["x0"] < 380]
+    landing_words = [w for w in words if w["text"] == "Landing" and w["x0"] < 380]
+    if taxi_words and landing_words:
+        top_bound = taxi_words[0]["top"] - 20
+        bottom_bound = landing_words[0]["top"] + 15
+        left_words = sorted(
+            (w for w in words if w["x0"] < 380 and top_bound < w["top"] < bottom_bound),
+            key=lambda w: (round(w["top"]), w["x0"]),
+        )
+        left_text = " ".join(w["text"] for w in left_words)
+        result["fuel"] = _parse_cover_fuel_block(left_text)
+
+    # Tripulação/SOB: coluna direita (x0 >= 380), delimitada entre "Recall"
+    # e "Signature".
+    recall_words = [w for w in words if w["text"] == "Recall" and w["x0"] >= 380]
+    signature_words = [w for w in words if w["text"] == "Signature" and w["x0"] >= 380]
+    if recall_words and signature_words:
+        top_bound = recall_words[0]["top"] - 5
+        bottom_bound = signature_words[0]["top"] + 15
+        right_words = sorted(
+            (w for w in words if w["x0"] >= 380 and top_bound < w["top"] < bottom_bound),
+            key=lambda w: (round(w["top"]), w["x0"]),
+        )
+        crew, info = _parse_cover_crew_block([w["text"] for w in right_words])
+        result["crew"] = crew
+        result["souls_on_board"] = info["souls_on_board"]
+        result["planner"] = info["planner"]
+        result["recall_number"] = info["recall_number"]
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # ROUTE — plano de voo ICAO (do PDF) x plano operacional apresentado (texto)
 # ---------------------------------------------------------------------------
 
@@ -736,6 +939,7 @@ def build_summary(pdf_bytes: bytes, filename: str = "briefing.pdf", plan_text: s
         weather = parse_weather(pdf)
         notam_records = parse_notams(pdf)
         route_briefing = parse_route_from_briefing(pdf)
+        cover = parse_cover_page(pdf)
 
     # Só interessam fechamentos de pista, táxi e aeródromo/aeroporto.
     closures = [r for r in notam_records if _is_closure(r.title)]
@@ -762,6 +966,7 @@ def build_summary(pdf_bytes: bytes, filename: str = "briefing.pdf", plan_text: s
     return {
         "filename": filename,
         "pages_read": True,
+        "cover": cover,
         "weather": weather,
         "notams": {
             "total": len(closures),
