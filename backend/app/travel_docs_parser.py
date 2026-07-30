@@ -53,11 +53,26 @@ class Person:
     ocr_uncertain: bool = False
 
 
+# Abreviações de mês fora do padrão de 3 letras que o %b do strptime espera
+# — vistas em documentos reais (ex: GEDEC digitado à mão com "22 Sept 1977"
+# em vez de "22 Sep 1977"). Comparação é case-insensitive.
+_MONTH_ALIASES = {"sept": "sep"}
+
+
+def _fix_month_alias(raw: str) -> str:
+    def repl(m: re.Match) -> str:
+        word = m.group(0)
+        alias = _MONTH_ALIASES.get(word.lower())
+        return alias.capitalize() if alias else word
+
+    return re.sub(r"[A-Za-z]+", repl, raw)
+
+
 def _normalize_date(raw: str | None, fmt: str) -> tuple[str | None, bool]:
     """Retorna (iso ou None, incerto). fmt: 'dd_mon_yyyy' | 'mon_dd_yyyy' | 'yyyy_mm_dd'."""
     if not raw:
         return None, False
-    raw = raw.strip()
+    raw = _fix_month_alias(raw.strip())
     try:
         if fmt == "dd_mon_yyyy":
             dt = datetime.strptime(raw, "%d %b %Y")
@@ -79,13 +94,13 @@ def _normalize_date(raw: str | None, fmt: str) -> tuple[str | None, bool]:
 _GEDEC_RANKS = "PIC|SIC|FO|FA|CPT|CA|PU|FE|NAV"
 _GEDEC_CREW_RE = re.compile(
     rf"^(?P<name>[A-ZÀ-Ÿ' ]+?)\s+(?P<rank>{_GEDEC_RANKS})\s+(?P<nat>[A-Z]{{3}})\s+"
-    rf"(?P<exp>\d{{1,2}}\s\w{{3}}\s\d{{4}})\s+(?P<doc>\S+)\s+"
-    rf"(?P<dob>\d{{1,2}}\s\w{{3}}\s\d{{4}})\s+(?P<license>\S+)\s*$"
+    rf"(?P<exp>\d{{1,2}}\s\w{{3,4}}\s\d{{4}})\s+(?P<doc>\S+)\s+"
+    rf"(?P<dob>\d{{1,2}}\s\w{{3,4}}\s\d{{4}})\s+(?P<license>\S+)\s*$"
 )
 _GEDEC_PAX_RE = re.compile(
     r"^(?P<name>[A-ZÀ-Ÿ' ]+?)\s+(?P<nat>[A-Z]{3})\s+"
-    r"(?P<exp>\d{1,2}\s\w{3}\s\d{4})\s+(?P<doc>\S+)\s+"
-    r"(?P<dob>\d{1,2}\s\w{3}\s\d{4})\s*$"
+    r"(?P<exp>\d{1,2}\s\w{3,4}\s\d{4})\s+(?P<doc>\S+)\s+"
+    r"(?P<dob>\d{1,2}\s\w{3,4}\s\d{4})\s*$"
 )
 
 
@@ -258,8 +273,8 @@ def parse_eapis(pdf_bytes: bytes) -> dict:
 # escopo desta comparação automática).
 
 _PAXLIST_ROW_RE = re.compile(
-    r"^(?P<name>.+?)\s+(?P<dob>\d{1,2}\s\w{3}\s\d{4})\s+"
-    r"(?P<nat>[A-Z]{3}):\s+(?P<doc>\S+)\s+\((?P<exp>\d{1,2}\s\w{3}\s\d{4})\)\s*$"
+    r"^(?P<name>.+?)\s+(?P<dob>\d{1,2}\s\w{3,4}\s\d{4})\s+"
+    r"(?P<nat>[A-Z]{3}):\s+(?P<doc>\S+)\s+\((?P<exp>\d{1,2}\s\w{3,4}\s\d{4})\)\s*$"
 )
 
 
