@@ -67,6 +67,12 @@ colocar algo funcional de pé, decidi:
   mês, Por hora, Heatmap, Calendário, Eventos); o PDF é um resumo
   equivalente em texto/tabelas, com as mesmas cores de categoria
   (VFR/MVFR/IFR/LIFR) usadas na tela.
+- **Visual (paleta e tipografia):** o frontend usa a paleta e a fonte
+  (Inter) do design system de referência em `docs/design-system-reference.png`
+  — primary/secondary navy, accent teal, warning/danger/success. Só o
+  visual mudou; a estrutura da página (sem sidebar, sem dashboard
+  consolidado) continua a mesma — isso fica pro roadmap gradual se
+  fizer sentido depois.
 - **NOTAM (fonte oficial):** ainda não integrado. A fonte planejada é a API
   AISWEB do DECEA (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo
   brasileiro) — chave de API já solicitada, pendente de aprovação. Quando

@@ -1,22 +1,26 @@
+/* Paleta e tipografia do design system de referência (ver
+   docs/design-system-reference.png e docs/VISAO_E_ROADMAP.md):
+   Primary #0B1320, Secondary #15202B, Accent #00A2A9, Warning #F5A623,
+   Danger #E63946, Success #22C55E, Neutral #E2E8F0, fonte Inter. */
 :root {
-  --bg: #0f1520;
-  --card-bg: #1a2333;
-  --text: #e8edf5;
+  --bg: #0b1320;
+  --card-bg: #15202b;
+  --text: #e2e8f0;
   --muted: #93a2b8;
-  --accent: #3b82f6;
-  --accent-dark: #2563eb;
-  --border: #2a3548;
+  --accent: #00a2a9;
+  --accent-dark: #007c82;
+  --border: #26333f;
   --vfr: #22c55e;
-  --mvfr: #3b82f6;
-  --ifr: #f59e0b;
-  --lifr: #ef4444;
+  --mvfr: #00a2a9;
+  --ifr: #f5a623;
+  --lifr: #e63946;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
@@ -135,7 +139,7 @@ select, input {
 
 .no-data-card {
   text-align: center;
-  border-color: #3a4358;
+  border-color: #34424f;
 }
 
 .no-data-card p:first-child {
@@ -285,7 +289,7 @@ textarea {
 }
 
 .route-token.removed {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(230, 57, 70, 0.15);
   color: var(--lifr);
   text-decoration: line-through;
 }
@@ -334,7 +338,7 @@ textarea {
 }
 
 .docs-table td.field-mismatch {
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(230, 57, 70, 0.12);
   color: var(--lifr);
   font-weight: 600;
   border-radius: 4px;
@@ -446,7 +450,7 @@ textarea {
 }
 
 .notam-badge.new {
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(245, 166, 35, 0.15);
   color: var(--ifr);
 }
 
@@ -456,12 +460,12 @@ textarea {
 }
 
 .weather-badge-svfr {
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(245, 166, 35, 0.15);
   color: var(--ifr);
 }
 
 .weather-badge-ifr {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(230, 57, 70, 0.15);
   color: var(--lifr);
 }
 
@@ -558,13 +562,13 @@ textarea {
 }
 
 .calendar-day.yellow {
-  background: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 166, 35, 0.2);
   color: var(--ifr);
   border-color: transparent;
 }
 
 .calendar-day.red {
-  background: rgba(239, 68, 68, 0.22);
+  background: rgba(230, 57, 70, 0.22);
   color: var(--lifr);
   border-color: transparent;
 }
@@ -616,7 +620,7 @@ textarea {
 }
 
 .events-table tr.event-row.selected {
-  background: rgba(59, 130, 246, 0.12);
+  background: rgba(0, 162, 169, 0.12);
 }
 
 .events-table td.worst-lifr {

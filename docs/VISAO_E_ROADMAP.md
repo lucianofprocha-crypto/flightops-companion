@@ -96,9 +96,7 @@ briefing) existem separadas, sem essa correlação automática.
 
 ## Design system de referência
 
-Ver `docs/design-system-reference.png`. Paleta e tipografia sugeridas
-(não aplicadas ainda ao frontend atual, que usa um tema escuro mais
-simples):
+Ver `docs/design-system-reference.png`.
 
 - Primary `#0B1320` · Secondary `#15202B` · Accent `#00A2A9`
 - Warning `#F5A623` · Danger `#E63946` · Success `#22C55E` · Neutral `#E2E8F0`
@@ -110,6 +108,11 @@ simples):
   (Weather/NOTAM/Airport/Alternate/Fuel/Handling), METAR com campos
   decompostos, NOTAM crítico em destaque, mini-mapa de rota, flight
   briefing summary com checklist, versão mobile equivalente.
+
+**✅ Paleta e tipografia — implementado em 30/07/2026.** `frontend/styles.css`
+e `frontend/app.js` (cores de gráficos/badges) agora usam as cores e a
+fonte Inter acima. Só a parte visual (cores/tipografia) — a estrutura da
+página continua a mesma (sem sidebar, sem risk score, sem mini-mapa).
 
 Esse dashboard consolidado (com risk score, mini-mapa e status chips)
 é essencialmente a visão de longo prazo do app — hoje o FlightOps

@@ -67,9 +67,9 @@ let lastDocsResult = null;
 
 const CATEGORY_COLORS = {
   VFR: "#22c55e",
-  MVFR: "#3b82f6",
-  IFR: "#f59e0b",
-  LIFR: "#ef4444",
+  MVFR: "#00a2a9",
+  IFR: "#f5a623",
+  LIFR: "#e63946",
   UNKNOWN: "#6b7280",
 };
 
@@ -273,7 +273,7 @@ function renderChartCategorias(catData) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: "#e8edf5" } } },
+      plugins: { legend: { labels: { color: "#e2e8f0" } } },
     },
   });
 }
@@ -295,14 +295,14 @@ function renderChartMes(byMonth) {
     type: "bar",
     data: {
       labels,
-      datasets: [{ label: "% condições adversas", data: values, backgroundColor: "#3b82f6" }],
+      datasets: [{ label: "% condições adversas", data: values, backgroundColor: "#00a2a9" }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        x: { ticks: { color: "#93a2b8" }, grid: { color: "#2a3548" } },
-        y: { ticks: { color: "#93a2b8" }, grid: { color: "#2a3548" }, beginAtZero: true },
+        x: { ticks: { color: "#93a2b8" }, grid: { color: "#26333f" } },
+        y: { ticks: { color: "#93a2b8" }, grid: { color: "#26333f" }, beginAtZero: true },
       },
       plugins: { legend: { display: false } },
     },
@@ -323,14 +323,14 @@ function renderChartHora(byHour) {
     type: "bar",
     data: {
       labels,
-      datasets: [{ label: "% condições adversas", data: values, backgroundColor: "#f59e0b" }],
+      datasets: [{ label: "% condições adversas", data: values, backgroundColor: "#f5a623" }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        x: { ticks: { color: "#93a2b8" }, grid: { color: "#2a3548" } },
-        y: { ticks: { color: "#93a2b8" }, grid: { color: "#2a3548" }, beginAtZero: true },
+        x: { ticks: { color: "#93a2b8" }, grid: { color: "#26333f" } },
+        y: { ticks: { color: "#93a2b8" }, grid: { color: "#26333f" }, beginAtZero: true },
       },
       plugins: { legend: { display: false } },
     },
@@ -415,7 +415,7 @@ function renderHeatmap(heatmap) {
       cell.className = "heatmap-cell";
       if (hasData) {
         const alpha = Math.min(1, pct / 100);
-        cell.style.background = `rgba(239, 68, 68, ${(0.08 + alpha * 0.85).toFixed(2)})`;
+        cell.style.background = `rgba(230, 57, 70, ${(0.08 + alpha * 0.85).toFixed(2)})`;
         cell.title = `${meses[month - 1]} ${String(hour).padStart(2, "0")}h — ${pct}% abaixo dos mínimos (${cellData.count} obs.)`;
       } else {
         cell.style.background = "transparent";
@@ -573,7 +573,7 @@ function renderEventDetail(evento) {
         {
           label: "Visibilidade (m)",
           data: visData,
-          borderColor: "#3b82f6",
+          borderColor: "#00a2a9",
           backgroundColor: "transparent",
           yAxisID: "y",
           tension: 0.2,
@@ -581,7 +581,7 @@ function renderEventDetail(evento) {
         {
           label: "Teto (ft)",
           data: ceilData,
-          borderColor: "#f59e0b",
+          borderColor: "#f5a623",
           backgroundColor: "transparent",
           yAxisID: "y1",
           tension: 0.2,
@@ -592,11 +592,11 @@ function renderEventDetail(evento) {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        x: { ticks: { color: "#93a2b8" }, grid: { color: "#2a3548" } },
+        x: { ticks: { color: "#93a2b8" }, grid: { color: "#26333f" } },
         y: {
           position: "left",
           ticks: { color: "#93a2b8" },
-          grid: { color: "#2a3548" },
+          grid: { color: "#26333f" },
           title: { display: true, text: "m", color: "#93a2b8" },
         },
         y1: {
@@ -606,7 +606,7 @@ function renderEventDetail(evento) {
           title: { display: true, text: "ft", color: "#93a2b8" },
         },
       },
-      plugins: { legend: { labels: { color: "#e8edf5" } } },
+      plugins: { legend: { labels: { color: "#e2e8f0" } } },
     },
   });
 
