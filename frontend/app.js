@@ -1545,12 +1545,11 @@ function renderChecklistGeralAuto() {
 }
 
 const CHECKLIST_MANUAL_ITEMS = [
-  { id: "doc-aeronave", label: "Documentação da aeronave conferida (matrícula, aeronavegabilidade, seguro)" },
-  { id: "peso-balanceamento", label: "Peso e balanceamento calculado" },
-  { id: "combustivel", label: "Combustível calculado e conferido" },
-  { id: "briefing-tripulacao", label: "Briefing de tripulação realizado" },
-  { id: "bagagem-carga", label: "Bagagem/carga conferida" },
-  { id: "equip-emergencia", label: "Equipamentos de emergência verificados" },
+  { id: "fuel-release", label: "Fuel Release" },
+  { id: "hotel", label: "Hotel" },
+  { id: "sobrevoos", label: "Sobrevoos" },
+  { id: "transporte-crew", label: "Transporte CREW" },
+  { id: "transporte-pax", label: "Transporte PAX" },
 ];
 
 const CHECKLIST_MANUAL_KEY = "flightops_checklist_manual";
