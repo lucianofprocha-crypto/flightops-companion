@@ -32,6 +32,7 @@ from .metar_client import (
     fetch_historical_metar,
 )
 from .minima_events import build_events_summary
+from .notam_client import NotamFetchError, fetch_notams
 from .report_generator import build_report
 from .travel_docs_parser import build_docs_summary
 
@@ -64,6 +65,10 @@ _OBS_CACHE: dict[tuple[str, str], tuple[float, list[MetarObservation]]] = {}
 _ATIS_CACHE: dict[str, tuple[float, list[dict]]] = {}
 _ATIS_CACHE_TTL_SECONDS = 5 * 60  # 5 minutos
 
+# NOTAM também é dado ao vivo (fonte oficial AISWEB/DECEA) — mesmo TTL curto do ATIS.
+_NOTAM_CACHE: dict[str, tuple[float, dict]] = {}
+_NOTAM_CACHE_TTL_SECONDS = 5 * 60  # 5 minutos
+
 
 def _get_observations(icao: str, period: str) -> list[MetarObservation]:
     cache_key = (icao, period)
@@ -94,6 +99,28 @@ def get_atis(icao: str = Query(..., min_length=4, max_length=4)) -> dict:
         _ATIS_CACHE[icao] = (time.time(), reports)
 
     return {"icao": icao, "available": len(reports) > 0, "reports": reports}
+
+
+@app.get("/api/notam")
+def get_notam(icao: str = Query(..., min_length=4, max_length=4)) -> dict:
+    """NOTAM oficial vigente (fonte AISWEB/DECEA). Diferente do ATIS, uma
+    falha aqui vira erro explícito (502) em vez de lista vazia silenciosa —
+    NOTAM é dado de segurança, "não verificado" não pode parecer "sem
+    NOTAM ativo" para quem está lendo."""
+    icao = icao.upper()
+
+    cached = _NOTAM_CACHE.get(icao)
+    if cached and (time.time() - cached[0]) < _NOTAM_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    try:
+        notams = fetch_notams(icao)
+    except NotamFetchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    result = {"icao": icao, "available": True, "notams": [n.to_dict() for n in notams]}
+    _NOTAM_CACHE[icao] = (time.time(), result)
+    return result
 
 
 @app.get("/api/climatology")

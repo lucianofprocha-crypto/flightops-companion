@@ -8,6 +8,8 @@ const $resultados = document.getElementById("resultados");
 const $semDados = document.getElementById("sem-dados");
 const $atisCard = document.getElementById("atis-card");
 const $atisContent = document.getElementById("atis-content");
+const $notamCard = document.getElementById("notam-card");
+const $notamContent = document.getElementById("notam-content");
 const $metarAtualContent = document.getElementById("metar-atual-content");
 
 const $briefingFile = document.getElementById("briefing-file");
@@ -123,13 +125,15 @@ async function analisar() {
   $resultados.classList.add("hidden");
   $semDados.classList.add("hidden");
   $atisCard.classList.add("hidden");
+  $notamCard.classList.add("hidden");
   $eventsResultados.classList.add("hidden");
   $exportCard.classList.add("hidden");
   setStatus(`Buscando histórico METAR de ${icao} (${periodoLabel(periodo)})...`);
 
-  // ATIS e eventos abaixo dos mínimos são complementos — buscamos em
+  // ATIS, NOTAM e eventos abaixo dos mínimos são complementos — buscamos em
   // paralelo e nunca deixamos eles travarem a análise principal.
   buscarAtis(icao);
+  buscarNotam(icao);
   buscarEventos(icao, periodo);
 
   try {
@@ -204,6 +208,73 @@ function renderAtis(reports) {
     $atisContent.appendChild(bloco);
   }
   $atisCard.classList.remove("hidden");
+}
+
+async function buscarNotam(icao) {
+  try {
+    const resp = await fetch(`${API_BASE}/api/notam?icao=${encodeURIComponent(icao)}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      renderNotamError(err.detail || `Erro ${resp.status} ao consultar NOTAM.`);
+      return;
+    }
+    const data = await resp.json();
+    renderNotam(data.notams || []);
+  } catch (err) {
+    // Diferente do ATIS, NOTAM é dado de segurança: uma falha de rede
+    // também precisa aparecer pro usuário, não pode ficar silenciosa.
+    renderNotamError(`Não foi possível verificar NOTAM: ${err.message}`);
+  }
+}
+
+function renderNotamError(message) {
+  $notamContent.innerHTML = "";
+  const aviso = document.createElement("div");
+  aviso.className = "notam-error";
+  aviso.textContent = `⚠️ ${message} — NOTAM não verificado, confirme por outra fonte antes do voo.`;
+  $notamContent.appendChild(aviso);
+  $notamCard.classList.remove("hidden");
+}
+
+function renderNotam(notams) {
+  $notamContent.innerHTML = "";
+
+  if (!notams.length) {
+    const vazio = document.createElement("p");
+    vazio.className = "muted";
+    vazio.style.margin = "0";
+    vazio.textContent = "Nenhum NOTAM ativo encontrado para este aeródromo.";
+    $notamContent.appendChild(vazio);
+    $notamCard.classList.remove("hidden");
+    return;
+  }
+
+  for (const n of notams) {
+    const bloco = document.createElement("div");
+    bloco.className = "notam-item";
+
+    const titulo = document.createElement("div");
+    titulo.className = "notam-item-title";
+    titulo.textContent = n.cod || n.numero || "NOTAM";
+
+    const meta = document.createElement("div");
+    meta.className = "notam-item-meta";
+    const partesMeta = [];
+    if (n.periodo) partesMeta.push(n.periodo);
+    else if (n.inicio || n.fim) partesMeta.push(`${n.inicio || "?"} — ${n.fim || "?"}`);
+    if (n.loc) partesMeta.push(n.loc);
+    meta.textContent = partesMeta.join(" · ");
+
+    const texto = document.createElement("div");
+    texto.className = "notam-item-text";
+    texto.textContent = n.texto || "";
+
+    bloco.appendChild(titulo);
+    if (partesMeta.length) bloco.appendChild(meta);
+    bloco.appendChild(texto);
+    $notamContent.appendChild(bloco);
+  }
+  $notamCard.classList.remove("hidden");
 }
 
 function renderMetarAtual(current) {

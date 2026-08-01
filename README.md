@@ -89,11 +89,18 @@ colocar algo funcional de pé, decidi:
   bagagem/carga, equipamentos de emergência), marcáveis e salvos no
   navegador (`localStorage`). Não é um checklist oficial de
   aeronave/operador — é um lembrete geral.
-- **NOTAM (fonte oficial):** ainda não integrado. A fonte planejada é a API
-  AISWEB do DECEA (oficial, cobre NOTAM/METAR/TAF/cartas para o espaço aéreo
-  brasileiro) — chave de API já solicitada, pendente de aprovação. Quando
-  chegar, ativar em `backend/app/notam_client.py` (a criar) seguindo o mesmo
-  padrão de `metar_client.py`.
+- **NOTAM (fonte oficial):** integrado via API AISWEB do DECEA (oficial,
+  cobre NOTAM/METAR/TAF/cartas para o espaço aéreo brasileiro) —
+  `backend/app/notam_client.py`, servido por `GET /api/notam`, card próprio
+  na tela de Airport Intelligence (busca em paralelo com ATIS ao analisar um
+  ICAO). Diferente do ATIS (best-effort, silencioso quando indisponível),
+  uma falha aqui aparece como aviso explícito na tela — NOTAM é dado de
+  segurança, "não verificado" não pode parecer visualmente igual a "sem
+  NOTAM ativo". Credenciais (API-Key/API-Pass do DECEA) ficam em variáveis
+  de ambiente (`AISWEB_API_KEY` / `AISWEB_API_PASS`); localmente, em
+  `backend/.env` (veja `backend/.env.example`); no Render, configurar no
+  painel do serviço (Environment) — **ainda pendente de configurar em
+  produção**.
 - **Leitura de flight briefing (PDF):** upload de PDF de despacho (ex:
   ForeFlight) com extração automática dos pontos de atenção. Implementado em
   `backend/app/briefing_parser.py`: localiza a página de METAR/TAF/SIGMET
@@ -223,11 +230,9 @@ de deploy é o mesmo (push pro GitHub, Render redeploya automaticamente).
 
 ## Próximos passos sugeridos
 
-- **NOTAM (fonte oficial)**: chave da API AISWEB (DECEA) já solicitada,
-  pendente de aprovação. Quando chegar, integrar em
-  `backend/app/notam_client.py` seguindo o padrão de `metar_client.py` — vai
-  complementar (não substituir) a leitura de PDF acima, trazendo NOTAM
-  atualizado na hora em vez de depender de um briefing já gerado.
+- **Configurar `AISWEB_API_KEY` / `AISWEB_API_PASS` no Render** (painel do
+  serviço → Environment) para o NOTAM funcionar em produção — localmente já
+  está lendo de `backend/.env`.
 - Persistir os dados buscados (hoje o cache é só em memória e expira em 1h).
 - **Relatório em PDF — Fase 2, parte 2 (mapa de rota):** combustível,
   tripulação/SOB e ETD/ETA/ETE **já implementados** (ver seção de recursos

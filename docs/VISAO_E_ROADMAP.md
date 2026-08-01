@@ -37,8 +37,9 @@ crescendo sem precisar reescrever o sistema:
   parte estatística/histórica e o ATIS ao vivo)*
 - **Airport Engine** — pistas, cartas, procedimentos. *(não iniciado)*
 - **NOTAM Engine** — classificação e resumo de NOTAMs. *(hoje:
-  `briefing_parser.py` cobre a leitura a partir do PDF de briefing; uma
-  fonte oficial ao vivo — ex. AISWEB/DECEA — ainda está pendente)*
+  `briefing_parser.py` cobre a leitura a partir do PDF de briefing;
+  `notam_client.py` **implementado em 31/07/2026**, fonte oficial ao vivo
+  via AISWEB/DECEA, card próprio em Airport Intelligence)*
 - **Briefing Engine** — leitura e análise dos PDFs de despacho. *(hoje:
   `briefing_parser.py`, incluindo comparação de rota e checklist de
   coordenação)*
